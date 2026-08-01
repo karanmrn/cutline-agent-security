@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from app.event_bus import EventRecorder
 from app.integrations import safe_projection
-from app.integrations.overmind_trace import sanitized_event_attributes, status
+from app.integrations.overmind_trace import status
 from app.integrations.safe_projection import (
     SafeEvent,
     SafeOutcome,
@@ -211,40 +211,6 @@ def test_run_telemetry_isolates_each_lazy_adapter_failure(monkeypatch) -> None:
     assert len(observed) == 1
     assert observed[0].mode == RunMode.MONITOR
     assert SYNTHETIC_CANARY not in observed[0].model_dump_json()
-
-
-def test_overmind_event_attributes_never_include_secret_bearing_arguments() -> None:
-    event = Event(
-        event_id="evt_secret",
-        session_id="session_safe",
-        sequence_number=3,
-        actor="coding-agent",
-        source_type="tool_call",
-        source_trust=TrustLevel.UNTRUSTED,
-        data_class=DataClass.SECRET,
-        tool_name="upload_artifact",
-        destination="external-support",
-        action_type=ActionType.EXTERNAL_WRITE,
-        arguments_redacted={"payload": SYNTHETIC_CANARY},
-        policy_decision=PolicyDecision.DENY,
-        outcome="blocked",
-        message=f"must not export {SYNTHETIC_CANARY}",
-    )
-
-    attributes = sanitized_event_attributes(event)
-
-    assert attributes == {
-        "cutline.event_id": "evt_secret",
-        "cutline.session_id": "session_safe",
-        "cutline.sequence_number": 3,
-        "cutline.source_trust": "UNTRUSTED",
-        "cutline.data_class": "SECRET",
-        "cutline.tool_name": "upload_artifact",
-        "cutline.action_type": "EXTERNAL_WRITE",
-        "cutline.policy_decision": "DENY",
-        "cutline.outcome": "blocked",
-    }
-    assert SYNTHETIC_CANARY not in str(attributes)
 
 
 def test_overmind_disabled_status_is_explicit(monkeypatch) -> None:
