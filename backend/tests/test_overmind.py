@@ -159,7 +159,8 @@ def test_trace_is_one_fixed_tree_with_no_input_or_output_capture(
     ):
         assert forbidden not in serialized
     assert flushes == [1000]
-    assert adapter.status()["state"] == "ready"
+    assert adapter.status()["state"] == "unverified"
+    assert "ingestion remains unverified" in adapter.status()["message"]
 
 
 @pytest.mark.parametrize("stage", ["init", "span", "flush"])

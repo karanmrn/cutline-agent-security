@@ -80,8 +80,8 @@ def safe_run() -> SafeRun:
 
 def enable(monkeypatch) -> None:
     monkeypatch.setenv("CUTLINE_LANGFUSE_ENABLED", "1")
-    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-synthetic")
-    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-synthetic")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "synthetic-public-key")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "synthetic-secret-key")
     monkeypatch.setenv("LANGFUSE_BASE_URL", "https://langfuse.invalid")
 
 
@@ -148,21 +148,21 @@ class FakeClient:
             raise RuntimeError("CUTLINE_CANARY_7F3A flush failure")
 
 
-def install_fake_sdk(monkeypatch, adapter, client: FakeClient) -> list[str | None]:
-    requested_keys: list[str | None] = []
+def install_fake_sdk(monkeypatch, adapter, client: FakeClient) -> list[dict[str, Any]]:
+    requested_configurations: list[dict[str, Any]] = []
 
-    def get_client(*, public_key: str | None = None) -> FakeClient:
-        requested_keys.append(public_key)
+    def create_client(**configuration: Any) -> FakeClient:
+        requested_configurations.append(configuration)
         return client
 
     monkeypatch.setattr(
         adapter,
         "import_module",
-        lambda name: SimpleNamespace(get_client=get_client)
+        lambda name: SimpleNamespace(Langfuse=create_client)
         if name == "langfuse"
         else pytest.fail(f"unexpected import: {name}"),
     )
-    return requested_keys
+    return requested_configurations
 
 
 def test_disabled_adapter_never_imports_sdk(adapter, monkeypatch, safe_run) -> None:
@@ -220,11 +220,18 @@ def test_trace_uses_fixed_nested_observations_without_capture(
 ) -> None:
     enable(monkeypatch)
     client = FakeClient()
-    requested_keys = install_fake_sdk(monkeypatch, adapter, client)
+    requested_configurations = install_fake_sdk(monkeypatch, adapter, client)
 
     adapter.trace_run(safe_run)
 
-    assert requested_keys == ["pk-lf-synthetic"]
+    assert requested_configurations == [
+        {
+            "public_key": "synthetic-public-key",
+            "secret_key": "synthetic-secret-key",
+            "base_url": "https://langfuse.invalid",
+            "tracing_enabled": True,
+        }
+    ]
     assert [(call.kwargs, call.parent_name) for call in client.calls] == [
         ({"name": "cutline-run", "as_type": "agent"}, None),
         ({"name": "fix-and-verify", "as_type": "chain"}, "cutline-run"),
@@ -252,7 +259,7 @@ def test_trace_uses_fixed_nested_observations_without_capture(
     assert client.flush_saw_open_observations is False
     assert adapter.status() == {
         "provider": "langfuse",
-        "state": "ready",
+        "state": "unverified",
         "configured": True,
         "last_checked_at": None,
         "message": "Telemetry flush completed; provider ingestion remains unverified.",
@@ -294,7 +301,7 @@ def test_sdk_failures_never_escape_or_expose_exception_text(
             adapter,
             "import_module",
             lambda _name: SimpleNamespace(
-                get_client=lambda **_kwargs: (_ for _ in ()).throw(
+                Langfuse=lambda **_kwargs: (_ for _ in ()).throw(
                     RuntimeError("CUTLINE_CANARY_7F3A init failure")
                 )
             ),

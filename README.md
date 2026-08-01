@@ -47,29 +47,19 @@ make audit
 
 Release evidence and manual invariants live in [docs/release/CHECKLIST.md](docs/release/CHECKLIST.md).
 
-## Optional Modal smoke test
+## Optional integrations
 
-Modal is never required for the local demo. After the local gates pass, configure
-your own Modal profile and run one explicit network-blocked replay:
-
-```bash
-cd backend
-uv sync --frozen --extra modal
-uv run modal setup
-CUTLINE_MODAL_ENABLED=1 uv run python modal_sandbox.py --mode enforce
-```
-
-The command uses only a generated synthetic fixture and `block_network=True`.
-With `CUTLINE_MODAL_ENABLED=1`, Modal appears as configured but unverified in the
-UI. Selecting it and explicitly approving replay performs the verification run;
-the runtime marks it ready only after that replay succeeds.
-If the profile is missing, keep `CUTLINE_MODAL_ENABLED` unset and use Local in
-the UI; the status remains `disabled` or `unverified` and no silent fallback
-occurs. Never put Modal credentials in this repository or in frontend code.
+Langfuse, Overmind, Supabase, Modal, and Ossprey are opt-in adapters. Local
+execution remains authoritative and no adapter participates in deterministic
+enforcement. Setup, smoke gates, and credential boundaries live in
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ## Architecture and status
 
-Local execution is authoritative. Optional Modal, Overmind, Supabase, and Ossprey adapters cannot turn an unavailable or failed integration into local success. Installed packages or configuration alone do not make an integration ready. Claim readiness only after its explicit smoke path succeeds and the runtime reports that result.
+Local execution is authoritative. Optional adapters cannot turn an unavailable
+or failed integration into local success. Installed packages or configuration
+alone do not make an integration ready. Claim readiness only after its explicit
+smoke path succeeds and the intended provider displays or stores the result.
 
 Architecture decisions:
 

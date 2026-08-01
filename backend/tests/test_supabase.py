@@ -177,6 +177,9 @@ def test_rows_match_schema_and_recursively_redact_all_strings(replay_bundle) -> 
     assert {"arguments", "arguments_redacted", "test_output", "payload"}.isdisjoint(
         _all_keys(rows)
     )
+    policy_storage_id = f"policy-[REDACTED]:{policy.policy_hash}"
+    assert rows["policies"][0]["id"] == policy_storage_id
+    assert rows["replays"][0]["policy_id"] == policy_storage_id
 
     schema = Path("supabase/schema.sql").read_text()
     assert {
@@ -195,13 +198,13 @@ def test_client_creation_uses_secret_key_and_stays_unverified(monkeypatch) -> No
 
     monkeypatch.setenv("CUTLINE_SUPABASE_ENABLED", "1")
     monkeypatch.setenv("SUPABASE_URL", "https://synthetic.invalid")
-    monkeypatch.setenv("SUPABASE_SECRET_KEY", "sb_secret_synthetic")
+    monkeypatch.setenv("SUPABASE_SECRET_KEY", "synthetic-secret-key")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "must-not-be-used")
     monkeypatch.setitem(sys.modules, "supabase", SimpleNamespace(create_client=create_client))
 
     status = SupabaseMirror().status()
 
-    assert created_with == [("https://synthetic.invalid", "sb_secret_synthetic")]
+    assert created_with == [("https://synthetic.invalid", "synthetic-secret-key")]
     assert status == {
         "provider": "supabase",
         "state": "unverified",

@@ -45,3 +45,10 @@ Show:
 “CUTLINE converts an incident into a versioned policy and permanent regression fixture. Trace, isolate, patch, verify.”
 
 Stop.
+
+## Optional provider evidence after core demo
+
+Show integration states only after the local proof completes. A ready label is
+supporting evidence, never part of the enforcement claim. If any provider is
+disabled, unverified, or failed, say so directly and keep the local result as
+the source of truth.

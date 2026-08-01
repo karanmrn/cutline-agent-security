@@ -3,7 +3,7 @@
 setup: backend frontend
 
 backend:
-	cd backend && uv sync --frozen
+	cd backend && uv sync --frozen --all-extras
 
 frontend:
 	cd frontend && npm ci

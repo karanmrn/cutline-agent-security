@@ -97,27 +97,26 @@ def trace_run(run: SafeRun) -> None:
             "cutline.run",
             span_type=sdk.SpanType.ENTRY_POINT,
             attributes=_run_attributes(run),
+        ), sdk.start_span(
+            "cutline.fix-and-verify",
+            span_type=sdk.SpanType.WORKFLOW,
+            attributes={"cutline.event_count": len(run.events)},
         ):
-            with sdk.start_span(
-                "cutline.fix-and-verify",
-                span_type=sdk.SpanType.WORKFLOW,
-                attributes={"cutline.event_count": len(run.events)},
-            ):
-                for event in run.events:
-                    sdk_name = _EVENT_NAMES[event.tool_category]
-                    with sdk.start_span(
-                        f"cutline.event.{sdk_name}",
-                        span_type=_span_type(sdk, event.tool_category),
-                        attributes=_event_attributes(event),
-                    ):
-                        pass
+            for event in run.events:
+                sdk_name = _EVENT_NAMES[event.tool_category]
+                with sdk.start_span(
+                    f"cutline.event.{sdk_name}",
+                    span_type=_span_type(sdk, event.tool_category),
+                    attributes=_event_attributes(event),
+                ):
+                    pass
         sdk.force_flush_traces(timeout_millis=1000)
     except Exception:  # noqa: BLE001 - optional telemetry cannot affect CUTLINE
         _state = "error"
         _message = "Overmind telemetry failed."
         return
     _last_checked_at = datetime.now(UTC)
-    _state = "ready"
+    _state = "unverified"
     _message = "Telemetry flush completed; provider ingestion remains unverified."
 
 

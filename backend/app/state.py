@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from threading import Lock
 
 from app.integrations.langfuse_trace import status as langfuse_status
+from app.integrations.ossprey_scan import status as ossprey_status
 from app.integrations.overmind_trace import status as overmind_status
 from app.integrations.supabase_store import mirror as supabase_mirror
 from app.models import (
@@ -119,31 +120,10 @@ class DemoStore:
                 else "Set CUTLINE_MODAL_ENABLED=1 after Modal setup.",
             ),
             "langfuse": IntegrationStatus.model_validate(langfuse_status()),
-            "overmind": _status(
-                "overmind",
-                IntegrationState.DISABLED,
-                False,
-                "Set CUTLINE_OVERMIND_ENABLED=1 after configuring Overmind.",
-            ),
-            "supabase": _status(
-                "supabase",
-                IntegrationState.DISABLED,
-                False,
-                "Set CUTLINE_SUPABASE_ENABLED=1 after configuring Supabase.",
-            ),
-            "ossprey": _status(
-                "ossprey",
-                IntegrationState.DISABLED,
-                False,
-                "Enable only after sponsor staff provide a documented integration path.",
-            ),
+            "overmind": IntegrationStatus.model_validate(overmind_status()),
+            "supabase": IntegrationStatus.model_validate(supabase_mirror.status()),
+            "ossprey": IntegrationStatus.model_validate(ossprey_status()),
         }
-        if os.getenv("CUTLINE_OVERMIND_ENABLED") == "1":
-            integrations["overmind"] = IntegrationStatus.model_validate(overmind_status())
-        if os.getenv("CUTLINE_SUPABASE_ENABLED") == "1":
-            integrations["supabase"] = IntegrationStatus.model_validate(
-                supabase_mirror.status()
-            )
         integrations.update(self._integration_overrides)
         return DemoState(
             vulnerable_run=self._vulnerable_run,

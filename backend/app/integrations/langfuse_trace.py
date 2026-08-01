@@ -54,10 +54,15 @@ def _get_client() -> Any | None:
         return _client
 
     _initialization_attempted = True
-    public_key, _secret_key, _base_url = configuration
+    public_key, secret_key, base_url = configuration
     try:
-        get_client = import_module("langfuse").get_client
-        _client = get_client(public_key=public_key)
+        langfuse = import_module("langfuse")
+        _client = langfuse.Langfuse(
+            public_key=public_key,
+            secret_key=secret_key,
+            base_url=base_url,
+            tracing_enabled=True,
+        )
     except Exception:  # noqa: BLE001 - optional telemetry cannot fail local runs
         _set_error("Langfuse client initialization failed.")
         return None
@@ -95,7 +100,7 @@ def trace_run(run: SafeRun) -> None:
         _set_error("Langfuse telemetry flush failed.")
         return
 
-    _state = "ready"
+    _state = "unverified"
     _message = "Telemetry flush completed; provider ingestion remains unverified."
 
 

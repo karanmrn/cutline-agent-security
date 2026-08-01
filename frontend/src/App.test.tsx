@@ -44,6 +44,33 @@ const replayEvent = {
   message: 'Policy blocked synthetic secret egress.',
 }
 
+const replayGraph = {
+  nodes: [
+    {
+      id: 'workspace-rule',
+      label: 'Poisoned workspace rule',
+      kind: 'instruction',
+      status: 'danger',
+      event_id: 'evt-replay-rule',
+    },
+    {
+      id: 'secret-read',
+      label: 'Synthetic secret read',
+      kind: 'data',
+      status: 'danger',
+      event_id: 'evt-replay-read',
+    },
+    {
+      id: 'external-write',
+      label: 'External write blocked',
+      kind: 'sink',
+      status: 'blocked',
+      event_id: 'evt-replay-upload',
+    },
+  ],
+  edges: [],
+}
+
 const graph = {
   nodes: [
     {
@@ -129,6 +156,7 @@ const replayRun = {
   exfiltration_blocked: true,
   collector_count: 0,
   events: [replayEvent],
+  graph: replayGraph,
 }
 
 const integrations = {
@@ -205,6 +233,87 @@ afterEach(() => {
 })
 
 describe('CUTLINE console', () => {
+  it('makes the complete security story and idle state explicit', async () => {
+    vi.mocked(api.state).mockResolvedValue(emptyState)
+    render(<App />)
+
+    const currentStatus = await screen.findByRole('region', {
+      name: 'Current incident status',
+    })
+    expect(within(currentStatus).getByRole('heading', { name: 'IDLE' })).toBeInTheDocument()
+
+    const story = screen.getByRole('list', { name: 'CUTLINE security story' })
+    for (const label of [
+      'Trusted user task',
+      'Untrusted repository instruction',
+      'Synthetic sensitive-file read',
+      'Attempted external write',
+      'Incident detected',
+      'Guardrail proposed',
+      'Human approval',
+      'Replay blocks the attack',
+      'Legitimate task still succeeds',
+    ]) {
+      expect(within(story).getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  it('shows incident, approval, and verified lifecycle states from backend snapshots', async () => {
+    vi.mocked(api.state).mockResolvedValue({
+      ...emptyState,
+      vulnerable_run: incidentRun,
+    } as unknown as DemoState)
+    const incident = render(<App />)
+    expect(
+      within(await screen.findByRole('region', { name: 'Current incident status' })).getByRole(
+        'heading',
+        { name: 'INCIDENT DETECTED' },
+      ),
+    ).toBeInTheDocument()
+    incident.unmount()
+
+    vi.mocked(api.state).mockResolvedValue({
+      ...stateWithoutManifest,
+      replay_run: null,
+    })
+    const approval = render(<App />)
+    const awaiting = await screen.findByRole('region', { name: 'Current incident status' })
+    expect(
+      await within(awaiting).findByRole('heading', { name: 'AWAITING APPROVAL' }),
+    ).toBeInTheDocument()
+    expect(within(awaiting).getByText('GUARDRAIL PROPOSED')).toBeInTheDocument()
+    approval.unmount()
+
+    vi.mocked(api.state).mockResolvedValue(fullState)
+    render(<App />)
+    expect(
+      within(await screen.findByRole('region', { name: 'Current incident status' })).getByRole(
+        'heading',
+        { name: 'PATCH VERIFIED' },
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the replay graph as blocked after verification', async () => {
+    render(<App />)
+
+    const graphPanel = await screen.findByRole('region', { name: 'Attack path visualization' })
+    expect(within(graphPanel).getByText('External write blocked')).toBeInTheDocument()
+    expect(within(graphPanel).queryByText('Synthetic canary exposed')).not.toBeInTheDocument()
+  })
+
+  it('marks exposed synthetic data as danger and idle outcomes as unknown', async () => {
+    const completed = render(<App />)
+
+    expect(await screen.findByLabelText('Synthetic secret exposed: yes')).toHaveClass('danger')
+    completed.unmount()
+
+    vi.mocked(api.state).mockResolvedValue(emptyState)
+    render(<App />)
+    expect(await screen.findAllByLabelText('Synthetic secret exposed: not run')).toHaveLength(2)
+    expect(screen.getAllByText('NOT RUN')).toHaveLength(8)
+  })
+
   it('shows compact candidate disruption comparison and exact policy lineage', async () => {
     render(<App />)
 
@@ -324,6 +433,12 @@ describe('CUTLINE console', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Run compromised agent' }))
     expect(screen.getByRole('status')).toHaveTextContent('Running compromised agent…')
+    expect(
+      within(screen.getByRole('region', { name: 'Current incident status' })).getByRole(
+        'heading',
+        { name: 'RUNNING' },
+      ),
+    ).toBeInTheDocument()
 
     await act(async () => {
       resolveRun?.({ ...emptyState, vulnerable_run: incidentRun } as unknown as DemoState)
@@ -341,6 +456,35 @@ describe('CUTLINE console', () => {
     await user.click(await screen.findByRole('button', { name: 'Run compromised agent' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Fixture creation failed.')
+    expect(
+      within(screen.getByRole('region', { name: 'Current incident status' })).getByRole(
+        'heading',
+        { name: 'ERROR' },
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows replaying while approved policy executes', async () => {
+    let resolveReplay: ((state: DemoState) => void) | undefined
+    vi.mocked(api.replay).mockReturnValue(
+      new Promise((resolve) => {
+        resolveReplay = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Approve and replay' }))
+    expect(
+      within(screen.getByRole('region', { name: 'Current incident status' })).getByRole(
+        'heading',
+        { name: 'REPLAYING' },
+      ),
+    ).toBeInTheDocument()
+
+    await act(async () => {
+      resolveReplay?.(fullState)
+    })
   })
 
   it('offers regression manifest only after backend state provides one', async () => {

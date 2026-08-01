@@ -62,6 +62,7 @@ def mirror_rows(
     manifest: RegressionManifest,
 ) -> dict[str, list[dict[str, Any]]]:
     all_events = vulnerable.events + replay.events
+    policy_storage_id = f"{policy.id}:{policy.policy_hash}"
     rows = {
         "sessions": [_session_row(vulnerable), _session_row(replay)],
         "events": [_event_row(event) for event in all_events],
@@ -76,7 +77,7 @@ def mirror_rows(
         ],
         "policies": [
             {
-                "id": policy.id,
+                "id": policy_storage_id,
                 "version": policy.version,
                 "policy_hash": policy.policy_hash,
                 "effect": policy.effect.value,
@@ -88,7 +89,7 @@ def mirror_rows(
         "replays": [
             {
                 "session_id": replay.session_id,
-                "policy_id": policy.id,
+                "policy_id": policy_storage_id,
                 "blocked": replay.exfiltration_blocked,
                 "utility_retained": replay.code_fixed,
                 "digest_sha256": manifest.digest_sha256,

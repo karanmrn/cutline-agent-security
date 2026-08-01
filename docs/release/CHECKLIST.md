@@ -34,6 +34,11 @@ Local behavior may be called ready only after the automated gate and full browse
 
 An optional integration may be called ready only after its documented smoke path succeeds against the intended account and the runtime reports ready. Disabled, configured, unverified, and error are valid release states. Never turn an optional provider failure into a local success claim.
 
+Provider-specific setup and evidence requirements live in
+[../INTEGRATIONS.md](../INTEGRATIONS.md). For telemetry, inspect the remote trace
+tree. For Supabase, inspect stored sanitized rows. SDK flush or client creation
+alone is not proof of remote ingestion.
+
 ## Freeze
 
 - Rehearse the three-minute flow five times.

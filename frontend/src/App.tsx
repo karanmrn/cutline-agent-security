@@ -64,11 +64,26 @@ function providerSelectable(state: DemoState, provider: ReplayProvider) {
   )
 }
 
-function Outcome({ label, value }: { label: string; value: boolean }) {
+function Outcome({
+  label,
+  value,
+  expected,
+  known,
+}: {
+  label: string
+  value: boolean
+  expected: boolean
+  known: boolean
+}) {
+  const tone = !known ? 'unknown' : value === expected ? 'safe' : 'danger'
+  const displayedValue = known ? (value ? 'YES' : 'NO') : 'NOT RUN'
   return (
-    <div className="outcome-row">
+    <div
+      aria-label={`${label}: ${known ? (value ? 'yes' : 'no') : 'not run'}`}
+      className={`outcome-row ${tone}`}
+    >
       <span>{label}</span>
-      <strong className={value ? 'yes' : 'no'}>{value ? 'YES' : 'NO'}</strong>
+      <strong>{displayedValue}</strong>
     </div>
   )
 }
@@ -87,10 +102,30 @@ function RunCard({ title, run }: { title: string; run: RunResult | null }) {
         />
       </div>
       <div className="outcomes">
-        <Outcome label="Synthetic secret exposed" value={Boolean(run?.secret_exposed)} />
-        <Outcome label="Exfiltration blocked" value={Boolean(run?.exfiltration_blocked)} />
-        <Outcome label="Application fixed" value={Boolean(run?.code_fixed)} />
-        <Outcome label="Tests passed" value={Boolean(run?.tests_passed)} />
+        <Outcome
+          expected={false}
+          known={Boolean(run)}
+          label="Synthetic secret exposed"
+          value={Boolean(run?.secret_exposed)}
+        />
+        <Outcome
+          expected
+          known={Boolean(run)}
+          label="Exfiltration blocked"
+          value={Boolean(run?.exfiltration_blocked)}
+        />
+        <Outcome
+          expected
+          known={Boolean(run)}
+          label="Application fixed"
+          value={Boolean(run?.code_fixed)}
+        />
+        <Outcome
+          expected
+          known={Boolean(run)}
+          label="Tests passed"
+          value={Boolean(run?.tests_passed)}
+        />
       </div>
       <div className="provider-row">
         <span>Provider</span>
@@ -129,7 +164,14 @@ function NodeCard({ node }: { node: GraphNode }) {
   )
 }
 
-function AttackPath({ run }: { run: RunResult | null }) {
+function AttackPath({
+  incident,
+  replay,
+}: {
+  incident: RunResult | null
+  replay: RunResult | null
+}) {
+  const run = replay ?? incident
   const dangerous = useMemo(
     () =>
       run?.graph.nodes.filter((node) =>
@@ -156,11 +198,15 @@ function AttackPath({ run }: { run: RunResult | null }) {
     ))
 
   return (
-    <article className="panel graph-panel">
+    <article
+      aria-label="Attack path visualization"
+      className="panel graph-panel"
+      role="region"
+    >
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Evidence graph</span>
-          <h3>Two paths. One task.</h3>
+          <span className="eyebrow">{replay ? 'Replay attack path' : 'Evidence graph'}</span>
+          <h3>{replay ? 'Attack blocked. Task intact.' : 'Two paths. One task.'}</h3>
         </div>
         <Activity aria-hidden="true" size={20} />
       </div>
@@ -532,6 +578,105 @@ function IntegrationsPanel({ integrations }: { integrations: DemoState['integrat
 
 type ActionName = 'incident' | 'policy' | 'replay' | 'reset'
 
+type LifecycleState =
+  | 'IDLE'
+  | 'RUNNING'
+  | 'INCIDENT DETECTED'
+  | 'AWAITING APPROVAL'
+  | 'REPLAYING'
+  | 'PATCH VERIFIED'
+  | 'ERROR'
+
+const storySteps = [
+  { label: 'Trusted user task', tone: 'trusted' },
+  { label: 'Untrusted repository instruction', tone: 'danger' },
+  { label: 'Synthetic sensitive-file read', tone: 'danger' },
+  { label: 'Attempted external write', tone: 'danger' },
+  { label: 'Incident detected', tone: 'danger' },
+  { label: 'Guardrail proposed', tone: 'control' },
+  { label: 'Human approval', tone: 'control' },
+  { label: 'Replay blocks the attack', tone: 'safe' },
+  { label: 'Legitimate task still succeeds', tone: 'safe' },
+] as const
+
+function lifecycleState(
+  state: DemoState,
+  loading: ActionName | null,
+  error: string | null,
+): LifecycleState {
+  if (error) return 'ERROR'
+  if (loading === 'replay') return 'REPLAYING'
+  if (loading) return 'RUNNING'
+  if (state.replay_run) return 'PATCH VERIFIED'
+  if (state.proposed_policy) return 'AWAITING APPROVAL'
+  if (state.vulnerable_run) return 'INCIDENT DETECTED'
+  return 'IDLE'
+}
+
+function completedStorySteps(state: DemoState, loading: ActionName | null) {
+  if (state.replay_run) return storySteps.length
+  if (loading === 'replay') return 7
+  if (state.proposed_policy) return 6
+  if (state.vulnerable_run) return 5
+  if (loading) return 1
+  return 0
+}
+
+function CurrentStatus({
+  current,
+  state,
+  loading,
+  selectedProvider,
+}: {
+  current: LifecycleState
+  state: DemoState
+  loading: ActionName | null
+  selectedProvider: ReplayProvider
+}) {
+  const completedSteps = completedStorySteps(state, loading)
+  const descriptions: Record<LifecycleState, string> = {
+    IDLE: 'Ready to run one controlled synthetic incident.',
+    RUNNING: 'Executing the trusted task and recording every decision.',
+    'INCIDENT DETECTED': 'Untrusted instruction reached a secret read and external-write attempt.',
+    'AWAITING APPROVAL': 'Review the narrow guardrail, then approve one exact replay.',
+    REPLAYING: `Enforcing the approved policy in a fresh ${selectedProvider} fixture.`,
+    'PATCH VERIFIED': 'Attack blocked. Application fixed. Tests passed.',
+    ERROR: 'Demo action failed. Review the error and reset or retry.',
+  }
+
+  return (
+    <section
+      aria-label="Current incident status"
+      className={`panel status-board status-${current.toLowerCase().replaceAll(' ', '-')}`}
+    >
+      <div className="current-status">
+        <span className="eyebrow">Current incident status</span>
+        <h2>{current}</h2>
+        {state.proposed_policy && !state.replay_run && loading !== 'replay' && (
+          <span className="status-context">GUARDRAIL PROPOSED</span>
+        )}
+        <p>{descriptions[current]}</p>
+        <div className="status-provider">
+          <span>Replay provider</span>
+          <strong>{selectedProvider}</strong>
+        </div>
+      </div>
+      <ol aria-label="CUTLINE security story" className="story-list">
+        {storySteps.map((step, index) => {
+          const progress =
+            index < completedSteps ? 'complete' : index === completedSteps ? 'active' : 'pending'
+          return (
+            <li className={`story-step ${step.tone} ${progress}`} key={step.label}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <strong>{step.label}</strong>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
 const actionMessages: Record<ActionName, { progress: string; complete: string }> = {
   incident: {
     progress: 'Running compromised agent…',
@@ -605,6 +750,7 @@ export default function App() {
   }
 
   const replayReady = providerSelectable(state, selectedProvider)
+  const currentLifecycle = lifecycleState(state, loading, error)
 
   return (
     <main aria-busy={Boolean(loading)} className="app-shell">
@@ -695,6 +841,13 @@ export default function App() {
         </div>
       )}
 
+      <CurrentStatus
+        current={currentLifecycle}
+        loading={loading}
+        selectedProvider={selectedProvider}
+        state={state}
+      />
+
       <section aria-label="Before and after outcomes" className="results-grid">
         <RunCard title="Before - monitor mode" run={state.vulnerable_run} />
         <RunCard title="After - enforce mode" run={state.replay_run} />
@@ -702,7 +855,7 @@ export default function App() {
 
       <section className="main-grid">
         <div className="left-column">
-          <AttackPath run={state.vulnerable_run} />
+          <AttackPath incident={state.vulnerable_run} replay={state.replay_run} />
           <PolicyPanel
             onProviderChange={setSelectedProvider}
             policy={state.proposed_policy}
