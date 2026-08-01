@@ -29,10 +29,10 @@
 - Consumes: `DemoState`, existing API actions, and in-flight action names.
 - Produces: executable assertions for `IDLE`, `RUNNING`, `INCIDENT DETECTED`, `GUARDRAIL PROPOSED`, `AWAITING APPROVAL`, `REPLAYING`, `PATCH VERIFIED`, and `ERROR`.
 
-- [ ] Run backend tests and frontend tests unchanged to establish baseline.
-- [ ] Launch FastAPI and Vite, reset the demo, and capture current Chrome state.
-- [ ] Add a focused UI test that expects the explicit lifecycle state sequence and required security-story labels.
-- [ ] Run the focused test and confirm it fails because the current incident status is absent or incomplete.
+- [x] Run backend tests and frontend tests unchanged to establish baseline.
+- [x] Launch FastAPI and Vite, reset the demo, and capture current Chrome state.
+- [x] Add a focused UI test that expects the explicit lifecycle state sequence and required security-story labels.
+- [x] Run the focused test and confirm it fails because the current incident status is absent or incomplete.
 
 ### Task 2: Single-screen status and story hierarchy
 
@@ -45,11 +45,11 @@
 - Consumes: `DemoState`, `ActionName`, and redacted run/policy data.
 - Produces: a typed derived lifecycle status and a prominent current-status/story strip.
 
-- [ ] Implement the smallest typed lifecycle derivation needed to satisfy the failing test.
-- [ ] Render current status and the nine story steps without exposing secret contents.
-- [ ] Keep actions gated in the existing order and make human approval explicit.
-- [ ] Keep before/after cards, attack path, event IDs, provider label, and final `PATCH VERIFIED` visually dominant.
-- [ ] Run focused frontend tests until green, then run the full frontend suite.
+- [x] Implement the smallest typed lifecycle derivation needed to satisfy the failing test.
+- [x] Render current status and the nine story steps without exposing secret contents.
+- [x] Keep actions gated in the existing order and make human approval explicit.
+- [x] Keep before/after cards, attack path, event IDs, provider label, and final `PATCH VERIFIED` visually dominant.
+- [x] Run focused frontend tests until green, then run the full frontend suite.
 
 ### Task 3: Real end-to-end demo verification
 
@@ -60,11 +60,11 @@
 - Consumes: local FastAPI at `http://localhost:8000` and Vite at `http://localhost:5173`.
 - Produces: verified browser evidence for reset, compromised run, guardrail generation, approval, replay, error recovery, responsive layout, and secret redaction.
 
-- [ ] Use Chrome Computer Use to reset and execute all three demo actions in sequence.
-- [ ] Inspect each state for required sections, evidence IDs, provider truthfulness, and final proof.
-- [ ] Verify browser does not show `CUTLINE_CANARY_7F3A`.
-- [ ] Exercise one API error path and confirm `ERROR` appears with actionable copy, then reset.
-- [ ] Inspect desktop and narrow viewport layout for overflow or inaccessible controls.
+- [x] Use Chrome Computer Use to reset and execute all three demo actions in sequence.
+- [x] Inspect each state for required sections, evidence IDs, provider truthfulness, and final proof.
+- [x] Verify browser does not show `CUTLINE_CANARY_7F3A`.
+- [x] Exercise one API error path and confirm `ERROR` appears with actionable copy, then reset.
+- [x] Inspect desktop and narrow viewport layout for overflow or inaccessible controls.
 
 ### Task 4: Final verification and review
 
@@ -75,9 +75,9 @@
 - Consumes: final worktree and user acceptance checklist.
 - Produces: exact command results and changed-file report.
 
-- [ ] Run `cd backend && uv run --frozen pytest -q`.
-- [ ] Run `cd frontend && npm test`.
-- [ ] Run `cd frontend && npm run build`.
-- [ ] Review diff for scope, accessibility, canary redaction, and backend semantic preservation.
-- [ ] Dispatch an independent verifier subagent and resolve any failing verdict.
-- [ ] Report exact passes, failures, remaining stubs, and files changed by this task.
+- [x] Run `cd backend && uv run --frozen pytest -q`.
+- [x] Run `cd frontend && npm test`.
+- [x] Run `cd frontend && npm run build`.
+- [x] Review diff for scope, accessibility, canary redaction, and backend semantic preservation.
+- [x] Dispatch an independent verifier subagent and resolve any failing verdict.
+- [x] Report exact passes, failures, remaining stubs, and files changed by this task.
