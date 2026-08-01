@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 1: Explain CUTLINE</title>
+  <style>
+    :root { color-scheme:dark; --bg:#0c1119; --panel:#141d29; --ink:#eef4fb; --muted:#aebdcb; --blue:#77a8ff; --mint:#67e8b0; --red:#ff8d91; --line:#2b3a4c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 10% 0%,#1b3760,transparent 32rem),var(--bg); color:var(--ink); font:16px/1.6 Inter,ui-sans-serif,system-ui,sans-serif; }
+    main { max-width:920px; margin:auto; padding:48px 24px 72px; }
+    .eyebrow { color:var(--blue); font-size:.78rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { max-width:760px; margin:.4rem 0 1rem; font-size:clamp(2.5rem,7vw,5.6rem); letter-spacing:-.065em; line-height:.94; }
+    h2 { margin:2.8rem 0 .8rem; font-size:1.45rem; }
+    h3 { margin:1.4rem 0 .35rem; font-size:1rem; }
+    .lede { max-width:720px; color:var(--muted); font-size:1.18rem; }
+    .objective { margin:25px 0; padding:17px 19px; border:1px solid #355b91; border-radius:14px; background:#122441; }
+    .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    .card { padding:17px; border:1px solid var(--line); border-radius:14px; background:rgba(20,29,41,.9); }
+    .card strong { display:block; color:var(--blue); }
+    .card p { margin:.35rem 0 0; color:var(--muted); }
+    .script { padding:20px; border-left:4px solid var(--mint); background:#102b28; }
+    .script p { margin:0 0 .7rem; }
+    .script p:last-child { margin:0; }
+    .boundary { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .boundary div { padding:16px; border-radius:12px; border:1px solid var(--line); }
+    .boundary .yes { border-color:#286a58; background:#102b28; }
+    .boundary .no { border-color:#70434b; background:#321a24; }
+    ul { padding-left:1.25rem; }
+    li { margin:.35rem 0; }
+    details { margin:.7rem 0; padding:13px 15px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+    summary { cursor:pointer; color:var(--blue); font-weight:700; }
+    label { display:block; margin:.75rem 0 .25rem; color:var(--muted); }
+    input { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:#0a1018; color:var(--ink); }
+    button { margin-top:14px; padding:10px 14px; border:0; border-radius:8px; background:var(--blue); color:#08111d; font-weight:800; cursor:pointer; }
+    #feedback { min-height:1.7em; color:var(--mint); }
+    footer { margin-top:3rem; color:var(--muted); font-size:.9rem; }
+    a { color:var(--blue); }
+    @media (max-width:700px) { .grid,.boundary { grid-template-columns:1fr; } }
+    @media print { body { background:#fff; color:#111; } .card,.objective,details { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Lesson 1 · product explanation</div>
+    <h1>Explain CUTLINE without hand-waving.</h1>
+    <p class="lede">Your job is not to list every file. Your job is to make one security claim believable: the attack was observed, the control was narrow, and replay proved useful work survived.</p>
+
+    <div class="objective"><strong>Win for this lesson:</strong> deliver a clear 30-second explanation, then point each sentence to an observable implementation detail.</div>
+
+    <h2>1. The product in one sentence</h2>
+    <div class="script"><p><strong>CUTLINE turns a synthetic autonomous-agent incident into a replay-tested guardrail.</strong></p><p>That sentence has three nouns you must explain: incident, guardrail, replay.</p></div>
+
+    <div class="grid">
+      <div class="card"><strong>Incident</strong><p>A fresh fixture contains an untrusted workspace rule. The agent reads the fake secret and attempts an external write to the in-memory collector.</p></div>
+      <div class="card"><strong>Guardrail</strong><p>A fixed-schema policy denies a secret external write when its destination is outside the session allowlist.</p></div>
+      <div class="card"><strong>Replay</strong><p>The same useful task runs from a second fresh fixture with explicit human approval of the exact policy.</p></div>
+      <div class="card"><strong>Proof</strong><p>The upload is blocked while the legitimate code fix and tests pass. The result becomes a digest-bound manifest.</p></div>
+    </div>
+
+    <h2>2. Tell the story in order</h2>
+    <ol>
+      <li><strong>Start with the threat:</strong> agents can treat hostile data as instructions. NIST calls this agent hijacking or indirect prompt injection.</li>
+      <li><strong>Make it safe:</strong> CUTLINE uses only a fake canary and an in-memory collector.</li>
+      <li><strong>Show causality:</strong> untrusted rule → secret read → external write. Each step has an event ID and parent link.</li>
+      <li><strong>Show restraint:</strong> the policy blocks only unauthorized secret egress. It does not disable the agent.</li>
+      <li><strong>Show proof:</strong> a human approves the policy ID, version, and hash; replay starts from a new fixture.</li>
+      <li><strong>Close with outcomes:</strong> no secret exposure, blocked egress, code fixed, tests passed.</li>
+    </ol>
+
+    <h2>3. Use this script</h2>
+    <div class="script">
+      <p>“An agent is asked to fix a failing test, but a poisoned workspace rule tells it to upload the environment file.”</p>
+      <p>“CUTLINE runs that scenario with a synthetic canary, records the causal evidence, and selects the lowest-disruption rule from four curated candidates: deny secret writes to unauthorized destinations.”</p>
+      <p>“After human approval, it replays the task in a fresh fixture. The write is blocked, but the code fix and tests still succeed.”</p>
+      <p>“So the output is not a scary trace. It is a replay-tested guardrail and a regression artifact.”</p>
+    </div>
+
+    <h2>4. Know your boundary</h2>
+    <div class="boundary">
+      <div class="yes"><strong>Claim confidently</strong><ul><li>Local deterministic replay is authoritative.</li><li>Evidence IDs connect explanation to events.</li><li>Optional adapters cannot change allow or deny.</li></ul></div>
+      <div class="no"><strong>Never overclaim</strong><ul><li>No real credential was handled.</li><li>No external exfiltration request was made.</li><li>Modal, Langfuse, Overmind, Supabase, and Ossprey remain unverified without live smoke evidence.</li></ul></div>
+    </div>
+
+    <h2>5. Retrieval check</h2>
+    <p>Answer from memory. Use the button only after writing your answers.</p>
+    <label for="q1">What is the three-step harmful evidence chain?</label>
+    <input id="q1" autocomplete="off" placeholder="three short stages">
+    <label for="q2">What makes enforcement deterministic?</label>
+    <input id="q2" autocomplete="off" placeholder="what decides allow or deny">
+    <label for="q3">What must survive replay?</label>
+    <input id="q3" autocomplete="off" placeholder="two useful-task outcomes">
+    <button type="button" id="check">Check recall</button>
+    <p id="feedback" role="status"></p>
+    <details><summary>Reveal the reference answers</summary><ul><li>Untrusted workspace rule, secret read, unauthorized external write.</li><li>Typed policy fields and runtime context, not an LLM judgment.</li><li>The legitimate code fix and fixture tests.</li></ul></details>
+
+    <h2>Next lesson</h2>
+    <p>Next: <a href="0002-read-the-event-chain.html">read one CUTLINE event chain like a security engineer</a>. Keep the <a href="../reference/cutline-explainer.html">explainer card</a> open while you practice.</p>
+
+    <footer>Primary sources: <a href="https://www.nist.gov/news-events/news/2025/01/technical-blog-strengthening-ai-agent-hijacking-evaluations">NIST agent hijacking context</a>, <a href="https://fastapi.tiangolo.com/tutorial/response-model/">FastAPI response models</a>, and <a href="https://react.dev/learn/thinking-in-react">React state and component thinking</a>. Ask me any follow-up question; I am your product teacher.</footer>
+  </main>
+  <script>
+    const answers = [
+      ['untrusted', 'secret', 'external'],
+      ['typed', 'policy', 'deterministic'],
+      ['code', 'test']
+    ];
+    document.querySelector('#check').addEventListener('click', () => {
+      const values = ['q1','q2','q3'].map(id => document.querySelector('#' + id).value.toLowerCase());
+      const score = values.reduce((total, value, index) => total + answers[index].every(word => value.includes(word)), 0);
+      const feedback = document.querySelector('#feedback');
+      feedback.textContent = score + '/3 complete. ' + (score === 3 ? 'You have the core story.' : 'Open the reference answers, then try again.');
+    });
+  </script>
+</body>
+</html>
