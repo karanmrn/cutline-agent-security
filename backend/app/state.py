@@ -51,6 +51,7 @@ class DemoStore:
             self._proposed_policy = None
             self._replay_run = None
             self._regression_manifest = None
+            self._integration_overrides.clear()
             return self.snapshot()
 
     def set_vulnerable(self, run: RunResult) -> None:
@@ -84,12 +85,18 @@ class DemoStore:
                 checked_at=datetime.now(UTC),
             )
 
-    def set_integration_error(self, name: str, error: str) -> None:
+    def set_integration_error(
+        self,
+        name: str,
+        error: str,
+        *,
+        configured: bool,
+    ) -> None:
         with self._lock:
             self._integration_overrides[name] = _status(
                 name,
                 IntegrationState.ERROR,
-                True,
+                configured,
                 error,
                 checked_at=datetime.now(UTC),
             )

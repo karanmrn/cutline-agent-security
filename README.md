@@ -60,6 +60,9 @@ CUTLINE_MODAL_ENABLED=1 uv run python modal_sandbox.py --mode enforce
 ```
 
 The command uses only a generated synthetic fixture and `block_network=True`.
+With `CUTLINE_MODAL_ENABLED=1`, Modal appears as configured but unverified in the
+UI. Selecting it and explicitly approving replay performs the verification run;
+the runtime marks it ready only after that replay succeeds.
 If the profile is missing, keep `CUTLINE_MODAL_ENABLED` unset and use Local in
 the UI; the status remains `disabled` or `unverified` and no silent fallback
 occurs. Never put Modal credentials in this repository or in frontend code.

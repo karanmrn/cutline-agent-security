@@ -107,7 +107,11 @@ def replay(approval: ReplayApproval) -> DemoState:
     try:
         run = get_replay_provider(approval.provider).replay(state.proposed_policy)
     except ProviderUnavailable as exc:
-        store.set_integration_error(approval.provider.value, str(exc))
+        store.set_integration_error(
+            approval.provider.value,
+            str(exc),
+            configured=os.getenv("CUTLINE_MODAL_ENABLED") == "1",
+        )
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     manifest = build_regression_manifest(
         vulnerable_run=state.vulnerable_run,

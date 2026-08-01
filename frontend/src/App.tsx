@@ -55,6 +55,15 @@ function providerReady(state: DemoState, provider: ReplayProvider) {
   return normalizedIntegrationState(state.integrations[provider]) === 'ready'
 }
 
+function providerSelectable(state: DemoState, provider: ReplayProvider) {
+  const integration = state.integrations[provider]
+  const status = normalizedIntegrationState(integration)
+  return (
+    status === 'ready' ||
+    (provider === 'modal' && status === 'unverified' && integration?.configured)
+  )
+}
+
 function Outcome({ label, value }: { label: string; value: boolean }) {
   return (
     <div className="outcome-row">
@@ -253,12 +262,13 @@ function ProviderSelector({
           const status = normalizedIntegrationState(integration)
           const reason = statusMessage(integration)
           const ready = status === 'ready'
+          const selectable = providerSelectable(state, id)
           return (
             <div className={`provider-option ${selected === id ? 'selected' : ''}`} key={id}>
               <div className="provider-option-line">
                 <input
                   checked={selected === id}
-                  disabled={!ready}
+                  disabled={!selectable}
                   id={`provider-${id}`}
                   name="replay-provider"
                   onChange={() => onSelect(id)}
@@ -565,7 +575,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!providerReady(state, selectedProvider) && providerReady(state, 'local')) {
+    if (!providerSelectable(state, selectedProvider) && providerReady(state, 'local')) {
       setSelectedProvider('local')
     }
   }, [selectedProvider, state])
@@ -594,7 +604,7 @@ export default function App() {
     }
   }
 
-  const replayReady = providerReady(state, selectedProvider)
+  const replayReady = providerSelectable(state, selectedProvider)
 
   return (
     <main aria-busy={Boolean(loading)} className="app-shell">

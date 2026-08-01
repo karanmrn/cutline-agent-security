@@ -144,6 +144,36 @@ def test_modal_replay_never_silently_falls_back_to_local() -> None:
     assert client.get("/api/state").json()["replay_run"] is None
 
 
+def test_failed_disabled_modal_replay_preserves_configuration_truth_and_resets(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("CUTLINE_MODAL_ENABLED", raising=False)
+    client.post("/api/demo/reset")
+    client.post("/api/demo/run-vulnerable")
+    policy = client.post("/api/demo/generate-policy").json()["proposed_policy"]
+
+    response = client.post(
+        "/api/demo/replay",
+        json={
+            "approved": True,
+            "policy_id": policy["id"],
+            "policy_version": policy["version"],
+            "policy_hash": policy["policy_hash"],
+            "provider": "modal",
+        },
+    )
+
+    assert response.status_code == 503
+    failed = client.get("/api/state").json()["integrations"]["modal"]
+    assert failed["state"] == "error"
+    assert failed["configured"] is False
+
+    reset = client.post("/api/demo/reset").json()["integrations"]["modal"]
+    assert reset["state"] == "unverified"
+    assert reset["configured"] is False
+    assert reset["last_checked_at"] is None
+
+
 def test_policy_requires_vulnerable_run() -> None:
     client.post("/api/demo/reset")
     response = client.post("/api/demo/generate-policy")

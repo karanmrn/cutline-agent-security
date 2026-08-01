@@ -248,6 +248,30 @@ describe('CUTLINE console', () => {
     expect(screen.getByText('Canonical provider state missing.')).toBeInTheDocument()
   })
 
+  it('allows an explicit verification replay for configured unverified Modal', async () => {
+    vi.mocked(api.state).mockResolvedValue({
+      ...stateWithoutManifest,
+      integrations: {
+        ...integrations,
+        modal: {
+          ...integrations.modal,
+          state: 'unverified',
+          configured: true,
+          message: 'Run one network-blocked replay to verify this provider.',
+        },
+      },
+    } as unknown as DemoState)
+    const user = userEvent.setup()
+    render(<App />)
+
+    const modal = await screen.findByRole('radio', { name: 'Modal' })
+    expect(modal).toBeEnabled()
+    await user.click(modal)
+    await user.click(screen.getByRole('button', { name: 'Approve and replay' }))
+
+    expect(api.replay).toHaveBeenCalledWith(expect.objectContaining({ id: policy.id }), 'modal')
+  })
+
   it('uses selected ready provider for exact-policy replay', async () => {
     vi.mocked(api.state).mockResolvedValue({
       ...fullState,
