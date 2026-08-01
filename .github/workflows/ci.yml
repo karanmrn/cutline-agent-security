@@ -1,0 +1,86 @@
+name: CI
+
+'on':
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.28"
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install locked backend dependencies
+        run: make backend
+
+      - name: Run backend tests
+        run: make test-backend
+
+      - name: Audit backend dependencies
+        run: make audit-backend
+
+  frontend:
+    name: Frontend tests, build, and audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.12.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: make frontend
+
+      - name: Run frontend tests
+        run: make test-frontend
+
+      - name: Build frontend
+        run: make build
+
+      - name: Audit frontend dependencies
+        run: make audit-frontend
+
+  secret-scan:
+    name: Static secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out full repository history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Scan history without credential verification
+        uses: trufflesecurity/trufflehog@17456f8c7d042d8c82c9a8ca9e937231f9f42e26 # v3.95.2
+        with:
+          base: ""
+          head: ${{ github.sha }}
+          version: "3.95.2"
+          extra_args: --no-verification --fail-on-scan-errors --results=verified,unknown,unverified

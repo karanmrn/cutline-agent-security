@@ -1,4 +1,4 @@
-import type { DemoState, ProposedPolicy } from './types'
+import type { DemoState, ProposedPolicy, ReplayProvider } from './types'
 
 async function request(
   path: string,
@@ -26,10 +26,12 @@ export const api = {
   reset: () => request('/api/demo/reset', 'POST'),
   runVulnerable: () => request('/api/demo/run-vulnerable', 'POST'),
   generatePolicy: () => request('/api/demo/generate-policy', 'POST'),
-  replay: (policy: ProposedPolicy) =>
+  replay: (policy: ProposedPolicy, provider: ReplayProvider) =>
     request('/api/demo/replay', 'POST', {
       approved: true,
       policy_id: policy.id,
       policy_version: policy.version,
+      policy_hash: policy.policy_hash,
+      provider,
     }),
 }

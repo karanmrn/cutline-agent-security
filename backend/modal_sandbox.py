@@ -24,7 +24,7 @@ def run_in_modal(
         .uv_pip_install(
             "pydantic>=2.10,<3",
             "pyyaml>=6,<7",
-            "pytest>=8,<10",
+            "pytest>=9.0.3,<10",
         )
         .add_local_python_source("app")
     )
