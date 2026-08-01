@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+import app.runner as runner_module
 from app.models import ActionType, PolicyDecision, ProposedPolicy, RunMode
 from app.policy import build_policy, evaluate_external_write
 from app.runner import SYNTHETIC_CANARY, AgentRunner
@@ -168,3 +169,28 @@ def test_enforced_replay_allows_an_action_that_does_not_match_the_policy() -> No
 
     assert result.exfiltration_blocked is False
     assert result.secret_exposed is True
+
+
+def test_failing_post_run_telemetry_cannot_change_local_results(monkeypatch) -> None:
+    vulnerable = AgentRunner().run(RunMode.MONITOR)
+    policy = build_policy(vulnerable.events)
+    observed = []
+
+    def fail_after_observing(run) -> None:
+        observed.append(run)
+        raise RuntimeError("synthetic telemetry failure")
+
+    monkeypatch.setattr(runner_module, "emit_run_telemetry", fail_after_observing)
+
+    monitor = AgentRunner().run(RunMode.MONITOR)
+    replay = AgentRunner().run(RunMode.ENFORCE, policy=policy)
+
+    assert observed == [monitor, replay]
+    assert monitor.secret_exposed is True
+    assert monitor.exfiltration_blocked is False
+    assert monitor.code_fixed is True
+    assert monitor.tests_passed is True
+    assert replay.secret_exposed is False
+    assert replay.exfiltration_blocked is True
+    assert replay.code_fixed is True
+    assert replay.tests_passed is True

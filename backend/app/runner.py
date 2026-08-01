@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from app.event_bus import EventRecorder
 from app.graph import build_evidence_graph
-from app.integrations.overmind_trace import trace_event
+from app.integrations.safe_projection import emit_run_telemetry
 from app.models import (
     ActionType,
     DataClass,
@@ -241,7 +241,7 @@ class AgentRunner:
         if enforce and policy is None:
             raise ValueError("Enforce mode requires an approved policy.")
         session_id = f"session_{uuid4().hex[:10]}"
-        recorder = EventRecorder(session_id=session_id, on_event=trace_event)
+        recorder = EventRecorder(session_id=session_id)
         collector = MockCollector()
 
         with tempfile.TemporaryDirectory(prefix="cutline-") as temp_dir:
@@ -310,7 +310,7 @@ class AgentRunner:
             else "RUN COMPLETE"
         )
 
-        return RunResult(
+        result = RunResult(
             session_id=session_id,
             fixture_id=fixture_id,
             mode=mode,
@@ -326,3 +326,8 @@ class AgentRunner:
             events=recorder.events,
             graph=build_evidence_graph(recorder.events),
         )
+        try:
+            emit_run_telemetry(result)
+        except Exception:  # noqa: BLE001, S110 - local result is authoritative
+            pass
+        return result
