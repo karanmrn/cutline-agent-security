@@ -1,0 +1,11 @@
+---
+alwaysApply: true
+---
+
+- Read `@AGENTS.md` before planning or editing.
+- The local deterministic demo is the critical path.
+- Never use real secrets, real victim systems, uncontrolled external endpoints, destructive commands, persistence, credential collection, or exploit payloads.
+- Do not replace the project stack unless explicitly requested.
+- Work in one phase at a time and preserve the six product invariants in `@AGENTS.md`.
+- Before claiming completion, run the relevant tests and state the exact commands and results.
+- Never claim Modal, Overmind, Supabase, or Ossprey works unless the integration was actually executed.

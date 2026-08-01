@@ -1,0 +1,12 @@
+---
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+- Use typed Pydantic models at API boundaries.
+- Keep security decisions in deterministic code under `app/policy.py`.
+- Treat `UNTRUSTED -> SECRET -> EXTERNAL_WRITE` as the core prohibited flow when the destination is not authorized.
+- Never store a raw secret in event arguments or logs.
+- The upload tool must write only to `MockCollector`; no HTTP call is permitted in the local runner.
+- Every behavioural change requires a focused pytest.
+- Preserve local fallback behaviour when adding optional integrations.

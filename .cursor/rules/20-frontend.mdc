@@ -1,0 +1,12 @@
+---
+globs: frontend/src/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+- Maintain a single-screen three-minute demo flow.
+- Primary actions must remain: Run compromised agent, Generate guardrail, Approve and replay.
+- Prioritize state clarity over settings or navigation.
+- Every claim displayed in the incident explanation must be backed by event IDs from the API.
+- Show loading and error states; disable actions when prerequisites are missing.
+- Keep the before/after result visible without scrolling on a typical laptop screen.
+- Do not expose raw secret payloads.
