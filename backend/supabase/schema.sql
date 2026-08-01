@@ -17,6 +17,7 @@ create table if not exists public.cutline_events (
   sequence_number integer not null,
   parent_event_id text null,
   actor text not null,
+  source_type text not null,
   source_trust text not null,
   data_class text not null,
   tool_name text not null,
@@ -58,7 +59,17 @@ create table if not exists public.cutline_replays (
   created_at timestamptz not null default now()
 );
 
--- For a hackathon browser demo, add narrowly scoped RLS before exposing any
--- table through a publishable/anon key. Never expose the service-role key.
+alter table public.cutline_sessions enable row level security;
+alter table public.cutline_events enable row level security;
+alter table public.cutline_incidents enable row level security;
+alter table public.cutline_policies enable row level security;
+alter table public.cutline_replays enable row level security;
+
+revoke all on table public.cutline_sessions from anon, authenticated;
+revoke all on table public.cutline_events from anon, authenticated;
+revoke all on table public.cutline_incidents from anon, authenticated;
+revoke all on table public.cutline_policies from anon, authenticated;
+revoke all on table public.cutline_replays from anon, authenticated;
+
 -- Enable Realtime only if needed:
 -- alter publication supabase_realtime add table public.cutline_events;

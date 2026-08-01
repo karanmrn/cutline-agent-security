@@ -8,8 +8,19 @@ from app.models import Event, ProposedPolicy, RegressionManifest, RunResult
 from app.runner import SYNTHETIC_CANARY
 
 
-def _safe_text(value: str) -> str:
-    return value.replace(SYNTHETIC_CANARY, "[REDACTED]")
+def _redact_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.replace(SYNTHETIC_CANARY, "[REDACTED]")
+    if isinstance(value, dict):
+        return {
+            _redact_strings(key): _redact_strings(nested_value)
+            for key, nested_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_strings(nested_value) for nested_value in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_strings(nested_value) for nested_value in value)
+    return value
 
 
 def _session_row(run: RunResult) -> dict[str, Any]:
@@ -40,7 +51,7 @@ def _event_row(event: Event) -> dict[str, Any]:
         "action_type": event.action_type.value,
         "policy_decision": event.policy_decision.value,
         "outcome": event.outcome,
-        "message": _safe_text(event.message),
+        "message": event.message,
     }
 
 
@@ -51,7 +62,7 @@ def mirror_rows(
     manifest: RegressionManifest,
 ) -> dict[str, list[dict[str, Any]]]:
     all_events = vulnerable.events + replay.events
-    return {
+    rows = {
         "sessions": [_session_row(vulnerable), _session_row(replay)],
         "events": [_event_row(event) for event in all_events],
         "incidents": [
@@ -71,7 +82,7 @@ def mirror_rows(
                 "effect": policy.effect.value,
                 "disruption_score": policy.disruption_score,
                 "evidence_event_ids": policy.evidence_event_ids,
-                "policy_yaml": _safe_text(policy.yaml),
+                "policy_yaml": policy.yaml,
             }
         ],
         "replays": [
@@ -84,6 +95,7 @@ def mirror_rows(
             }
         ],
     }
+    return _redact_strings(rows)
 
 
 class SupabaseMirror:
@@ -93,6 +105,12 @@ class SupabaseMirror:
         self.error: str | None = None
         self.last_checked_at: datetime | None = None
         self._initialization_attempted = client is not None
+        self._verified = False
+
+    def _record_error(self, message: str) -> None:
+        self._verified = False
+        self.error = message
+        self.last_checked_at = datetime.now(UTC)
 
     def _ensure_client(self) -> Any | None:
         if os.getenv("CUTLINE_SUPABASE_ENABLED") != "1":
@@ -101,17 +119,19 @@ class SupabaseMirror:
             return self.client
         self._initialization_attempted = True
         url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        key = os.getenv("SUPABASE_SECRET_KEY")
         self._configured = bool(url and key)
         if not url or not key:
-            self.error = "SUPABASE_URL and server-side key are required."
+            self._record_error(
+                "SUPABASE_URL and SUPABASE_SECRET_KEY (server-side key) are required."
+            )
             return None
         try:
             from supabase import create_client
 
             self.client = create_client(url, key)
-        except Exception as exc:  # pragma: no cover - optional integration  # noqa: BLE001
-            self.error = f"Supabase client unavailable: {exc}"
+        except Exception:  # pragma: no cover - optional integration  # noqa: BLE001
+            self._record_error("Supabase client unavailable.")
         return self.client
 
     def persist(
@@ -125,13 +145,16 @@ class SupabaseMirror:
         if client is None:
             return
         rows = mirror_rows(vulnerable, replay, policy, manifest)
+        self.error = None
+        self._verified = False
         try:
             for table, table_rows in rows.items():
-                for row in table_rows:
-                    client.table(f"cutline_{table}").upsert(row).execute()
-            self.last_checked_at = datetime.now(UTC)
-        except Exception as exc:  # pragma: no cover - optional integration  # noqa: BLE001
-            self.error = f"Supabase mirror failed: {exc}"
+                client.table(f"cutline_{table}").upsert(table_rows).execute()
+        except Exception:  # pragma: no cover - optional integration  # noqa: BLE001
+            self._record_error("Supabase mirror write failed.")
+            return
+        self.last_checked_at = datetime.now(UTC)
+        self._verified = True
 
     def status(self) -> dict[str, Any]:
         enabled = os.getenv("CUTLINE_SUPABASE_ENABLED") == "1"
@@ -154,10 +177,12 @@ class SupabaseMirror:
             }
         return {
             "provider": "supabase",
-            "state": "ready" if self.client else "unverified",
-            "configured": self.client is not None,
+            "state": "ready" if self._verified else "unverified",
+            "configured": self._configured,
             "last_checked_at": self.last_checked_at,
-            "message": None if self.client else "Run one mirror write to verify Supabase.",
+            "message": None
+            if self._verified
+            else "Run one mirror write to verify Supabase.",
         }
 
 
