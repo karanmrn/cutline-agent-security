@@ -4,6 +4,7 @@ import os
 from datetime import UTC, datetime
 from threading import Lock
 
+from app.integrations.langfuse_trace import status as langfuse_status
 from app.integrations.overmind_trace import status as overmind_status
 from app.integrations.supabase_store import mirror as supabase_mirror
 from app.models import (
@@ -117,6 +118,7 @@ class DemoStore:
                 if modal_enabled
                 else "Set CUTLINE_MODAL_ENABLED=1 after Modal setup.",
             ),
+            "langfuse": IntegrationStatus.model_validate(langfuse_status()),
             "overmind": _status(
                 "overmind",
                 IntegrationState.DISABLED,

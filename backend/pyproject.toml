@@ -13,10 +13,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+langfuse = ["langfuse==4.14.2"]
 modal = ["modal>=1.0"]
 overmind = ["overmind>=0.1.55,<0.2"]
 supabase = ["supabase>=2.15"]
-all = ["modal>=1.0", "overmind>=0.1.55,<0.2", "supabase>=2.15"]
+all = [
+  "langfuse==4.14.2",
+  "modal>=1.0",
+  "overmind>=0.1.55,<0.2",
+  "supabase>=2.15",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
