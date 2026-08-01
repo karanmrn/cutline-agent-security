@@ -325,7 +325,7 @@ const fullState = {
 const stateWithoutManifest = {
   ...fullState,
   regression_manifest: null,
-} as DemoState
+} satisfies DemoState
 
 const emptyState = {
   vulnerable_run: null,
@@ -502,7 +502,7 @@ describe('CUTLINE console', () => {
         ...replayRun,
         provider: 'modal-CUTLINE_CANARY_7F3A',
       },
-    } as DemoState)
+    } satisfies DemoState)
     render(<App />)
 
     const currentStatus = await screen.findByRole('region', {
@@ -643,9 +643,12 @@ describe('CUTLINE console', () => {
 
     await user.click(screen.getByRole('button', { name: 'Incident evidence' }))
 
-    expect(screen.getByRole('heading', { name: 'Incident evidence' })).toBeInTheDocument()
-    expect(screen.getByText('evt-incident-upload')).toBeInTheDocument()
-    expect(screen.queryByText('evt-replay-upload')).not.toBeInTheDocument()
+    const incidentTimeline = screen
+      .getByRole('heading', { name: 'Incident evidence' })
+      .closest('article')
+    expect(incidentTimeline).not.toBeNull()
+    expect(within(incidentTimeline!).getByText('evt-incident-upload')).toBeInTheDocument()
+    expect(within(incidentTimeline!).queryByText('evt-replay-upload')).not.toBeInTheDocument()
   })
 
   it('announces progress and completed result', async () => {
@@ -753,7 +756,7 @@ describe('CUTLINE console', () => {
         ...fullState.regression_manifest,
         source_fixture_id: 'fixture-CUTLINE_CANARY_7F3A',
       },
-    } as DemoState)
+    } satisfies DemoState)
     render(<App />)
 
     expect(await screen.findByText('fixture-[REDACTED]')).toBeInTheDocument()

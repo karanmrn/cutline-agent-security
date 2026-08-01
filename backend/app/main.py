@@ -124,7 +124,6 @@ def replay(approval: ReplayApproval) -> DemoState:
         state.vulnerable_run,
         run,
         state.proposed_policy,
-        manifest,
     )
     supabase_status = supabase_mirror.status()
     if supabase_status["state"] != "disabled":

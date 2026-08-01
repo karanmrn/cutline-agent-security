@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add safe, opt-in Langfuse, Overmind, Supabase, Modal, and Ossprey integration paths while keeping the fully local CUTLINE flow authoritative and unchanged.
+**Goal:** Add safe, opt-in Langfuse, Overmind, Supabase, and Modal integration paths while keeping the fully local CUTLINE flow authoritative and unchanged. Ossprey remains quarantined pending an official contract.
 
-**Architecture:** Provider adapters consume a fixed sanitized projection of completed synthetic runs. Telemetry and persistence are best-effort side effects after deterministic execution, never inputs to policy evaluation. Modal is the sole alternate execution provider and remains network-blocked. Ossprey is a local CLI verification signal only and never changes allow or deny decisions.
+**Architecture:** Provider adapters consume a fixed sanitized projection of completed synthetic runs. Telemetry and persistence are best-effort side effects after deterministic execution, never inputs to policy evaluation. Modal is the sole alternate execution provider and remains network-blocked. No Ossprey command contract is assumed.
 
 **Tech Stack:** Python 3.11+, FastAPI, Pydantic, Langfuse 4.14.2, Overmind 0.1.57, Supabase Python 2.31.0, Modal 1.5.3, pytest 9, React/Vite status UI.
 
@@ -17,7 +17,7 @@
 - Deterministic application code remains the only enforcement authority.
 - Modal replay uses fresh synthetic fixtures and `block_network=True`; no credentials or telemetry SDKs enter its sandbox.
 - Supabase credentials remain server-only. No browser client, publishable key, Realtime dependency, or authentication feature is added.
-- Ossprey runs only documented local safe mode against generated synthetic data. It cannot scan the developer workspace or add another attack scenario.
+- Ossprey stays unconfigured and unverified until sponsor staff provide an official API, CLI, starter repository, or direct technical support.
 - Every production change follows red-green TDD. No live credential appears in tests, fixtures, commands committed to git, logs, UI, or documentation.
 
 ---
@@ -83,7 +83,7 @@
 
 - [ ] **Step 4: Report truthful status**
 
-  `disabled` without flag, `error` with missing configuration or SDK failure, `unverified` after client creation, and `ready` only after a successful flush. Errors are bounded fixed-category messages with no provider exception text.
+  `disabled` without flag, `error` with missing configuration or SDK failure, and `unverified` after client creation or SDK flush. Report `ready` only after provider-side ingestion is confirmed. Errors are bounded fixed-category messages with no provider exception text.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -125,7 +125,8 @@
 **Files:**
 - Modify: `backend/app/integrations/supabase_store.py`
 - Modify: `backend/supabase/schema.sql`
-- Create: `backend/supabase/migrations/20260801_provider_contract.sql`
+- Preserve: `backend/supabase/migrations/20260801_provider_contract.sql`
+- Create: `backend/supabase/migrations/20260801_safe_projection.sql`
 - Modify: `backend/app/main.py`
 - Modify: `backend/app/state.py`
 - Modify: `backend/pyproject.toml`
@@ -144,11 +145,11 @@
 
 - [ ] **Step 2: Verify RED**
 
-  Run `cd backend && uv run pytest -q tests/test_supabase.py tests/test_api.py`. Expected failures: missing `source_type` column, per-row writes, and premature readiness.
+  Run `cd backend && uv run pytest -q tests/test_supabase.py tests/test_api.py`. Expected failures: missing fixed-schema safe tables, unsafe projection fields, per-row writes, and premature readiness.
 
 - [ ] **Step 3: Implement corrected mirror and migration**
 
-  Pin `supabase==2.31.0`. Bulk-upsert in dependency order. Add `source_type`, enable RLS on all tables, revoke browser roles, and add no browser policies. Local replay returns successfully even when mirror fails.
+  Pin `supabase==2.31.0`. Bulk-upsert sanitized rows in dependency order to additive `cutline_safe_*` tables. Preserve published migrations and legacy tables, enable RLS on every safe table, revoke browser roles, and add no browser policies. Local replay returns successfully even when mirror fails.
 
 - [ ] **Step 4: Verify GREEN**
 
@@ -183,33 +184,23 @@
 
   Run focused tests with Modal extra, full backend suite, and local worker contract without any live RPC.
 
-### Task 6: Ossprey local CLI adapter
+### Task 6: Ossprey quarantine
 
 **Files:**
-- Create: `backend/app/integrations/ossprey_scan.py`
 - Modify: `backend/app/state.py`
-- Modify: `backend/.env.example`
-- Test: `backend/tests/test_ossprey.py`
+- Test: `backend/tests/test_integrations.py`
 
 **Interfaces:**
-- Produces: `verify_synthetic_fixture() -> None` and canonical `status()`.
-- Uses documented `ossprey scan <generated-fixture> --local --dry-run-safe -o <temporary-output>` command only.
+- Produces only a canonical unverified, unconfigured integration status.
+- Consumes no environment variables and invokes no process or network boundary.
 
-- [ ] **Step 1: Write failing CLI-boundary tests**
+- [x] **Step 1: Reject undocumented contracts**
 
-  Assert disabled mode never resolves or launches a binary, enabled mode requires an explicit executable, scan target is a generated temporary fixture rather than workspace, command uses local safe mode, output file stays temporary, canary is absent from diagnostics, and scanner result never changes policy or replay outcomes.
+  Keep Ossprey unconfigured and unverified until sponsor staff provide an official API, CLI, starter repository, or direct technical support.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Preserve local authority**
 
-  Run `cd backend && uv run pytest -q tests/test_ossprey.py`. Expected failure: adapter does not exist.
-
-- [ ] **Step 3: Implement minimal subprocess adapter**
-
-  Use a fixed timeout, no shell, scrubbed child environment, bounded fixed-category errors, and guaranteed temporary cleanup. Keep status `unverified` until one safe local scan succeeds.
-
-- [ ] **Step 4: Verify GREEN**
-
-  Run focused tests and full local demo tests. Confirm Ossprey never participates in `evaluate_external_write`.
+  Confirm Ossprey cannot participate in policy evaluation or alter local demo results.
 
 ### Task 7: Documentation, full verification, and live smoke gates
 
@@ -232,7 +223,7 @@
 
 - [ ] **Step 3: Run authorized live smokes only with secure environment injection**
 
-  Run Modal, Langfuse, Overmind, Supabase, and Ossprey separately. Send only synthetic sanitized data. Record provider trace or row identifiers, status transitions, and teardown result without recording credentials.
+  Run Modal, Langfuse, Overmind, and Supabase separately. Send only synthetic sanitized data. Record provider trace or row identifiers, status transitions, and teardown result without recording credentials. Keep Ossprey quarantined.
 
 - [ ] **Step 4: Independent review and commit**
 

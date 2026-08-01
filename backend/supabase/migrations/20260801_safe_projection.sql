@@ -1,5 +1,7 @@
--- Optional CUTLINE event mirror. Apply only after the local demo works.
+begin;
 
+-- New fixed-schema tables leave the published legacy mirror untouched. Browser
+-- roles receive no access; only the configured server-side client may write.
 create table if not exists public.cutline_safe_sessions (
   run_id text primary key,
   mode text not null,
@@ -68,5 +70,4 @@ revoke all on table public.cutline_safe_incidents from anon, authenticated;
 revoke all on table public.cutline_safe_policies from anon, authenticated;
 revoke all on table public.cutline_safe_replays from anon, authenticated;
 
--- Enable Realtime only if needed:
--- alter publication supabase_realtime add table public.cutline_safe_events;
+commit;

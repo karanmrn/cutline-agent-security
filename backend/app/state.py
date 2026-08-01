@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from threading import Lock
 
 from app.integrations.langfuse_trace import status as langfuse_status
-from app.integrations.ossprey_scan import status as ossprey_status
 from app.integrations.overmind_trace import status as overmind_status
 from app.integrations.supabase_store import mirror as supabase_mirror
 from app.models import (
@@ -122,7 +121,12 @@ class DemoStore:
             "langfuse": IntegrationStatus.model_validate(langfuse_status()),
             "overmind": IntegrationStatus.model_validate(overmind_status()),
             "supabase": IntegrationStatus.model_validate(supabase_mirror.status()),
-            "ossprey": IntegrationStatus.model_validate(ossprey_status()),
+            "ossprey": _status(
+                "ossprey",
+                IntegrationState.UNVERIFIED,
+                False,
+                "Awaiting an official Ossprey API, CLI, starter, or sponsor-supported contract.",
+            ),
         }
         integrations.update(self._integration_overrides)
         return DemoState(

@@ -19,6 +19,7 @@ from app.models import ActionType, DataClass, Event, PolicyDecision, RunMode, Tr
 from app.policy import build_policy
 from app.regression import build_regression_manifest, verify_regression_manifest
 from app.runner import SYNTHETIC_CANARY, AgentRunner
+from app.state import DemoStore
 
 
 def test_safe_event_projection_excludes_every_free_text_field() -> None:
@@ -248,20 +249,18 @@ def test_supabase_rows_preserve_lineage_without_secret_payloads() -> None:
     vulnerable = AgentRunner().run(RunMode.MONITOR)
     policy = build_policy(vulnerable.events)
     replay = AgentRunner().run(RunMode.ENFORCE, policy=policy)
-    manifest = build_regression_manifest(
-        vulnerable_run=vulnerable,
-        replay_run=replay,
-        policy=policy,
-    )
-
-    rows = mirror_rows(vulnerable, replay, policy, manifest)
+    rows = mirror_rows(vulnerable, replay, policy)
     serialized = str(rows)
 
     assert SYNTHETIC_CANARY not in serialized
     assert rows["incidents"][0]["evidence_event_ids"] == policy.evidence_event_ids
     assert rows["policies"][0]["policy_hash"] == policy.policy_hash
-    assert rows["replays"][0]["digest_sha256"] == manifest.digest_sha256
+    assert rows["replays"][0]["tests_passed"] is True
     assert all("parent_event_id" in row for row in rows["events"])
+    assert all(
+        {"actor", "resource", "destination", "message", "tool_name"}.isdisjoint(row)
+        for row in rows["events"]
+    )
 
 
 def test_supabase_enabled_without_server_credentials_is_not_configured(monkeypatch) -> None:
@@ -281,6 +280,20 @@ def test_supabase_enabled_without_server_credentials_is_not_configured(monkeypat
         "last_checked_at",
         "message",
     }
+
+
+def test_ossprey_stays_quarantined_without_an_official_contract(monkeypatch) -> None:
+    monkeypatch.setenv("CUTLINE_OSSPREY_ENABLED", "1")
+    monkeypatch.setenv("CUTLINE_OSSPREY_EXECUTABLE", "/synthetic/bin/ossprey")
+
+    status = DemoStore().snapshot().integrations["ossprey"]
+
+    assert status.state.value == "unverified"
+    assert status.configured is False
+    assert status.last_checked_at is None
+    assert status.message == (
+        "Awaiting an official Ossprey API, CLI, starter, or sponsor-supported contract."
+    )
 
 
 def test_supabase_enabled_mirror_writes_all_tables_best_effort(monkeypatch) -> None:
@@ -307,21 +320,16 @@ def test_supabase_enabled_mirror_writes_all_tables_best_effort(monkeypatch) -> N
     vulnerable = AgentRunner().run(RunMode.MONITOR)
     policy = build_policy(vulnerable.events)
     replay = AgentRunner().run(RunMode.ENFORCE, policy=policy)
-    manifest = build_regression_manifest(
-        vulnerable_run=vulnerable,
-        replay_run=replay,
-        policy=policy,
-    )
     client = Client()
 
-    SupabaseMirror(client=client).persist(vulnerable, replay, policy, manifest)
+    SupabaseMirror(client=client).persist(vulnerable, replay, policy)
 
     assert {name for name, _row in client.calls} == {
-        "cutline_sessions",
-        "cutline_events",
-        "cutline_incidents",
-        "cutline_policies",
-        "cutline_replays",
+        "cutline_safe_sessions",
+        "cutline_safe_events",
+        "cutline_safe_incidents",
+        "cutline_safe_policies",
+        "cutline_safe_replays",
     }
     assert all(SYNTHETIC_CANARY not in str(row) for _name, row in client.calls)
 

@@ -53,8 +53,10 @@ Supabase is a server-only, best-effort mirror. Local memory remains source of
 truth. No publishable key, browser client, authentication, or Realtime
 dependency is used.
 
-Apply [schema.sql](../backend/supabase/schema.sql) and the matching migration in
-[migrations](../backend/supabase/migrations), then configure:
+For a fresh project, apply [schema.sql](../backend/supabase/schema.sql) only. For
+an existing project with legacy `cutline_*` tables, apply only
+[20260801_safe_projection.sql](../backend/supabase/migrations/20260801_safe_projection.sql).
+Do not replay the preserved historical provider-contract migration. Then configure:
 
 ```text
 CUTLINE_SUPABASE_ENABLED=1
@@ -63,8 +65,15 @@ SUPABASE_SECRET_KEY=sb_secret_...
 ```
 
 Run full local flow. Provider becomes ready only after bulk writes to all five
-tables succeed. Verify stored strings contain no raw synthetic canary and no
-event arguments, test output, or collector payload.
+tables succeed. The mirror consumes the same fixed `SafeRun` projection used by
+telemetry adapters. It stores only enum-backed run status, boolean outcomes,
+opaque derived run IDs, validated event lineage, tool categories, policy hashes,
+and evidence event IDs. Additive `cutline_safe_*` tables isolate this contract
+without rewriting or deleting legacy mirror rows. It excludes session and fixture IDs, actors, resources,
+destinations, messages, raw tool names, event arguments, test output, collector
+payloads, policy YAML, and regression digests. No live Supabase smoke has been
+completed, so this adapter remains unverified. Local in-memory demo state
+remains authoritative.
 
 ## Modal
 
@@ -86,23 +95,8 @@ Sandbox termination waits for completion and always detaches.
 
 ## Ossprey
 
-Ossprey verification is local-only. CUTLINE requires an explicit absolute CLI
-path and scans a disposable generated fixture using documented safe dry-run
-mode. It never scans the repository, workspace, or home directory and never
-affects enforcement.
-
-```text
-CUTLINE_OSSPREY_ENABLED=1
-CUTLINE_OSSPREY_EXECUTABLE=/absolute/path/to/ossprey
-```
-
-```bash
-cd backend
-uv run python -c \
-  'from app.integrations.ossprey_scan import verify_synthetic_fixture; verify_synthetic_fixture()'
-```
-
-This separate-process smoke proves only the local CLI adapter contract. Its
-status is process-local, so the running FastAPI UI remains unverified. Do not
-claim UI readiness and do not enable this adapter until an official Ossprey CLI
-binary is installed.
+Ossprey is quarantined. No API, CLI command, flags, output schema, or readiness
+claim is implemented because sponsor staff have not supplied an official
+contract. The UI reports Ossprey as unverified and unconfigured. Add an adapter
+only after receiving official documentation, a starter repository, or direct
+technical support, as required by `docs/BUILD_PLAN.md`.

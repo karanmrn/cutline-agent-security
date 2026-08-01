@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
+from hashlib import sha256
 from typing import Any
 
-from app.models import Event, ProposedPolicy, RegressionManifest, RunResult
+from app.integrations.safe_projection import SafeEvent, SafeRun, project_run
+from app.models import ProposedPolicy, RunResult
 from app.runner import SYNTHETIC_CANARY
+
+SQL_TABLE_PREFIX = "cutline_safe_"
 
 
 def _redact_strings(value: Any) -> Any:
@@ -23,35 +27,38 @@ def _redact_strings(value: Any) -> Any:
     return value
 
 
-def _session_row(run: RunResult) -> dict[str, Any]:
+def _run_id(run: SafeRun) -> str:
+    digest = sha256(run.model_dump_json().encode()).hexdigest()[:16]
+    return f"cutline_run_{digest}"
+
+
+def _session_row(run: SafeRun, run_id: str) -> dict[str, Any]:
     return {
-        "session_id": run.session_id,
-        "fixture_id": run.fixture_id,
+        "run_id": run_id,
         "mode": run.mode.value,
-        "provider": run.provider,
-        "status": run.status,
+        "provider": run.provider.value,
+        "status": run.status.value,
         "secret_exposed": run.secret_exposed,
+        "exfiltration_attempted": run.exfiltration_attempted,
+        "exfiltration_blocked": run.exfiltration_blocked,
+        "code_fixed": run.code_fixed,
         "tests_passed": run.tests_passed,
+        "collector_count": run.collector_count,
     }
 
 
-def _event_row(event: Event) -> dict[str, Any]:
+def _event_row(event: SafeEvent, run_id: str) -> dict[str, Any]:
     return {
         "event_id": event.event_id,
-        "session_id": event.session_id,
+        "run_id": run_id,
         "sequence_number": event.sequence_number,
         "parent_event_id": event.parent_event_id,
-        "actor": event.actor,
-        "source_type": event.source_type,
         "source_trust": event.source_trust.value,
         "data_class": event.data_class.value,
-        "tool_name": event.tool_name,
-        "resource": event.resource,
-        "destination": event.destination,
         "action_type": event.action_type.value,
         "policy_decision": event.policy_decision.value,
-        "outcome": event.outcome,
-        "message": event.message,
+        "tool_category": event.tool_category.value,
+        "outcome": event.outcome.value,
     }
 
 
@@ -59,20 +66,40 @@ def mirror_rows(
     vulnerable: RunResult,
     replay: RunResult,
     policy: ProposedPolicy,
-    manifest: RegressionManifest,
 ) -> dict[str, list[dict[str, Any]]]:
-    all_events = vulnerable.events + replay.events
-    policy_storage_id = f"{policy.id}:{policy.policy_hash}"
+    safe_vulnerable = project_run(vulnerable)
+    safe_replay = project_run(replay)
+    vulnerable_run_id = _run_id(safe_vulnerable)
+    replay_run_id = _run_id(safe_replay)
+    allowed_evidence_ids = {event.event_id for event in safe_vulnerable.events}
+    evidence_event_ids = [
+        event_id
+        for event_id in policy.evidence_event_ids
+        if event_id in allowed_evidence_ids
+    ]
+    policy_storage_id = f"cutline_policy_{policy.policy_hash}"
     rows = {
-        "sessions": [_session_row(vulnerable), _session_row(replay)],
-        "events": [_event_row(event) for event in all_events],
+        "sessions": [
+            _session_row(safe_vulnerable, vulnerable_run_id),
+            _session_row(safe_replay, replay_run_id),
+        ],
+        "events": [
+            *(
+                _event_row(event, vulnerable_run_id)
+                for event in safe_vulnerable.events
+            ),
+            *(_event_row(event, replay_run_id) for event in safe_replay.events),
+        ],
         "incidents": [
             {
-                "incident_id": f"incident_{vulnerable.session_id}",
-                "source_session_id": vulnerable.session_id,
-                "severity": "high",
-                "summary": "Synthetic secret reached unauthorized external write in monitor mode.",
-                "evidence_event_ids": policy.evidence_event_ids,
+                "incident_id": (
+                    "cutline_incident_"
+                    f"{vulnerable_run_id.removeprefix('cutline_run_')}"
+                ),
+                "source_run_id": vulnerable_run_id,
+                "secret_exposed": safe_vulnerable.secret_exposed,
+                "exfiltration_attempted": safe_vulnerable.exfiltration_attempted,
+                "evidence_event_ids": evidence_event_ids,
             }
         ],
         "policies": [
@@ -82,17 +109,16 @@ def mirror_rows(
                 "policy_hash": policy.policy_hash,
                 "effect": policy.effect.value,
                 "disruption_score": policy.disruption_score,
-                "evidence_event_ids": policy.evidence_event_ids,
-                "policy_yaml": policy.yaml,
+                "evidence_event_ids": evidence_event_ids,
             }
         ],
         "replays": [
             {
-                "session_id": replay.session_id,
+                "run_id": replay_run_id,
                 "policy_id": policy_storage_id,
-                "blocked": replay.exfiltration_blocked,
-                "utility_retained": replay.code_fixed,
-                "digest_sha256": manifest.digest_sha256,
+                "blocked": safe_replay.exfiltration_blocked,
+                "utility_retained": safe_replay.code_fixed,
+                "tests_passed": safe_replay.tests_passed,
             }
         ],
     }
@@ -105,7 +131,6 @@ class SupabaseMirror:
         self._configured = client is not None
         self.error: str | None = None
         self.last_checked_at: datetime | None = None
-        self._initialization_attempted = client is not None
         self._verified = False
 
     def _record_error(self, message: str) -> None:
@@ -116,9 +141,8 @@ class SupabaseMirror:
     def _ensure_client(self) -> Any | None:
         if os.getenv("CUTLINE_SUPABASE_ENABLED") != "1":
             return None
-        if self._initialization_attempted:
+        if self.client is not None:
             return self.client
-        self._initialization_attempted = True
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_SECRET_KEY")
         self._configured = bool(url and key)
@@ -131,6 +155,7 @@ class SupabaseMirror:
             from supabase import create_client
 
             self.client = create_client(url, key)
+            self.error = None
         except Exception:  # pragma: no cover - optional integration  # noqa: BLE001
             self._record_error("Supabase client unavailable.")
         return self.client
@@ -140,17 +165,16 @@ class SupabaseMirror:
         vulnerable: RunResult,
         replay: RunResult,
         policy: ProposedPolicy,
-        manifest: RegressionManifest,
     ) -> None:
         client = self._ensure_client()
         if client is None:
             return
-        rows = mirror_rows(vulnerable, replay, policy, manifest)
+        rows = mirror_rows(vulnerable, replay, policy)
         self.error = None
         self._verified = False
         try:
             for table, table_rows in rows.items():
-                client.table(f"cutline_{table}").upsert(table_rows).execute()
+                client.table(f"{SQL_TABLE_PREFIX}{table}").upsert(table_rows).execute()
         except Exception:  # pragma: no cover - optional integration  # noqa: BLE001
             self._record_error("Supabase mirror write failed.")
             return
