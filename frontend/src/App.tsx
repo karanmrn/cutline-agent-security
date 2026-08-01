@@ -29,6 +29,7 @@ import type {
 
 const emptyState: DemoState = {
   vulnerable_run: null,
+  incident: null,
   proposed_policy: null,
   replay_run: null,
   regression_manifest: null,
@@ -187,15 +188,29 @@ function AttackPath({
     [run],
   )
 
-  const path = (nodes: GraphNode[]) =>
-    nodes.map((node, index) => (
-      <div className="path-segment" key={node.id}>
-        <NodeCard node={node} />
-        {index < nodes.length - 1 && (
-          <ChevronRight aria-hidden="true" className="path-arrow" size={22} />
-        )}
-      </div>
-    ))
+  const path = (nodes: GraphNode[], label: string) => (
+    <div aria-label={label} className="path-row" role="group">
+      {nodes.map((node, index) => {
+        const nextNode = nodes[index + 1]
+        const edge = nextNode
+          ? run?.graph.edges.find(
+              (candidate) => candidate.source === node.id && candidate.target === nextNode.id,
+            )
+          : undefined
+        return (
+          <div className="path-segment" key={node.id}>
+            <NodeCard node={node} />
+            {edge && (
+              <div className={`path-connector ${edge.status}`}>
+                <span>{redactText(edge.label)}</span>
+                <ChevronRight aria-hidden="true" className="path-arrow" size={22} />
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <article
@@ -216,11 +231,11 @@ function AttackPath({
         <div className="graph-lanes">
           <div className="graph-lane">
             <span className="lane-label danger-text">Harmful path</span>
-            <div className="path-row">{path(dangerous)}</div>
+            {path(dangerous, 'Harmful path')}
           </div>
           <div className="graph-lane">
             <span className="lane-label safe-text">Legitimate path</span>
-            <div className="path-row">{path(legitimate)}</div>
+            {path(legitimate, 'Legitimate path')}
           </div>
         </div>
       )}
@@ -252,6 +267,120 @@ function TimelineEvent({ event }: { event: Event }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function CompromisedExecution({ run }: { run: RunResult | null }) {
+  const evidence = run?.execution_evidence
+
+  return (
+    <section
+      aria-label="Compromised agent execution"
+      className="panel execution-panel"
+      role="region"
+    >
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">Monitor-mode evidence</span>
+          <h3>Compromised agent execution</h3>
+        </div>
+        <Code2 aria-hidden="true" size={20} />
+      </div>
+      {!run ? (
+        <div className="empty">Run the compromised agent to inspect its safe execution record.</div>
+      ) : !evidence ? (
+        <div className="empty">Structured execution evidence is unavailable for this run.</div>
+      ) : (
+        <>
+          <div className="execution-summary">
+            <div aria-label="Trusted task" className="execution-callout trusted">
+              <span>Trusted task</span>
+              <p>{redactText(evidence.trusted_task)}</p>
+            </div>
+            <div
+              aria-label="Injected repository instruction"
+              className="execution-callout injected"
+            >
+              <span>Injected repository instruction</span>
+              <blockquote>{redactText(evidence.untrusted_instruction)}</blockquote>
+            </div>
+          </div>
+
+          <div className="execution-metadata">
+            <div aria-label="Instruction path">
+              <span>Instruction path</span>
+              <code>{redactText(evidence.instruction_path)}</code>
+            </div>
+            <div>
+              <span>Code path</span>
+              <code>{redactText(evidence.code_path)}</code>
+            </div>
+            <div aria-label="Attempted destination">
+              <span>Attempted destination</span>
+              <code>{redactText(evidence.attempted_destination)}</code>
+            </div>
+          </div>
+
+          <div className="execution-detail-grid">
+            <div>
+              <span className="execution-section-label">Application correction</span>
+              <div className="execution-code-diff">
+                <div aria-label="Code before" className="execution-code before">
+                  <span>Before</span>
+                  <pre>{redactText(evidence.code_before)}</pre>
+                </div>
+                <div aria-label="Code after" className="execution-code after">
+                  <span>After</span>
+                  <pre>{redactText(evidence.code_after)}</pre>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <span className="execution-section-label">Redacted action log</span>
+              <ul aria-label="Redacted action log" className="execution-actions">
+                {run.events.map((event) => (
+                  <li
+                    aria-label={`Action ${redactText(event.tool_name)}`}
+                    className="execution-action"
+                    key={event.event_id}
+                  >
+                    <strong>{redactText(event.tool_name)}</strong>
+                    <span>
+                      Evidence <code>{redactText(event.event_id)}</code>
+                    </span>
+                    <span>
+                      Decision <code>{redactText(event.policy_decision)}</code>
+                    </span>
+                    <span>
+                      Outcome <code>{redactText(event.outcome)}</code>
+                    </span>
+                    <span>
+                      Resource <code>{redactText(event.resource, '-')}</code>
+                    </span>
+                    <span>
+                      Destination <code>{redactText(event.destination, '-')}</code>
+                    </span>
+                    <span>
+                      Arguments{' '}
+                      <code>{redactText(JSON.stringify(event.arguments_redacted), '{}')}</code>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div aria-label="Test result" className="execution-test-result">
+            <div>
+              <span>Test command</span>
+              <code>{redactText(evidence.test_command)}</code>
+            </div>
+            <pre>{redactText(run.test_output, 'No test output recorded.')}</pre>
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 
@@ -345,7 +474,7 @@ function PolicyPanel({
   onProviderChange: (provider: ReplayProvider) => void
 }) {
   return (
-    <article className="panel policy-panel">
+    <article aria-label="Guardrail policy" className="panel policy-panel" role="region">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Least-disruptive control</span>
@@ -374,15 +503,28 @@ function PolicyPanel({
           </div>
           <CandidateComparison policy={policy} />
           <pre>{redactText(policy.yaml)}</pre>
-          <ProviderSelector
-            onSelect={onProviderChange}
-            selected={selectedProvider}
-            state={state}
-          />
-          <p className="approval-note" id="replay-approval">
-            Approval binds this exact policy version and hash to one fresh{' '}
-            {selectedProvider} replay.
-          </p>
+          {state.replay_run ? (
+            <div aria-label="Completed replay provider" className="completed-replay-provider">
+              <span>Completed replay provider</span>
+              <strong>{redactText(state.replay_run.provider)}</strong>
+            </div>
+          ) : (
+            <>
+              <ProviderSelector
+                onSelect={onProviderChange}
+                selected={selectedProvider}
+                state={state}
+              />
+              <div aria-label="Approval status" className="approval-status">
+                <span>Approval status</span>
+                <strong>AWAITING APPROVAL</strong>
+              </div>
+              <p className="approval-note" id="replay-approval">
+                Approval binds this exact policy version and hash to one fresh{' '}
+                {redactText(selectedProvider)} replay.
+              </p>
+            </>
+          )}
         </>
       )}
     </article>
@@ -465,7 +607,7 @@ function RegressionManifestPanel({ manifest }: { manifest: RegressionManifest })
     <article className="panel manifest-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Permanent proof</span>
+          <span className="eyebrow">Regression evidence</span>
           <h3>Regression manifest</h3>
         </div>
         <strong className="manifest-status">
@@ -582,7 +724,7 @@ type LifecycleState =
   | 'IDLE'
   | 'RUNNING'
   | 'INCIDENT DETECTED'
-  | 'AWAITING APPROVAL'
+  | 'GUARDRAIL PROPOSED'
   | 'REPLAYING'
   | 'PATCH VERIFIED'
   | 'ERROR'
@@ -608,7 +750,7 @@ function lifecycleState(
   if (loading === 'replay') return 'REPLAYING'
   if (loading) return 'RUNNING'
   if (state.replay_run) return 'PATCH VERIFIED'
-  if (state.proposed_policy) return 'AWAITING APPROVAL'
+  if (state.proposed_policy) return 'GUARDRAIL PROPOSED'
   if (state.vulnerable_run) return 'INCIDENT DETECTED'
   return 'IDLE'
 }
@@ -631,15 +773,16 @@ function CurrentStatus({
   current: LifecycleState
   state: DemoState
   loading: ActionName | null
-  selectedProvider: ReplayProvider
+  selectedProvider: string
 }) {
   const completedSteps = completedStorySteps(state, loading)
+  const safeProvider = redactText(selectedProvider)
   const descriptions: Record<LifecycleState, string> = {
     IDLE: 'Ready to run one controlled synthetic incident.',
     RUNNING: 'Executing the trusted task and recording every decision.',
     'INCIDENT DETECTED': 'Untrusted instruction reached a secret read and external-write attempt.',
-    'AWAITING APPROVAL': 'Review the narrow guardrail, then approve one exact replay.',
-    REPLAYING: `Enforcing the approved policy in a fresh ${selectedProvider} fixture.`,
+    'GUARDRAIL PROPOSED': 'Review the narrow guardrail, then approve one exact replay.',
+    REPLAYING: `Enforcing the approved policy in a fresh ${safeProvider} fixture.`,
     'PATCH VERIFIED': 'Attack blocked. Application fixed. Tests passed.',
     ERROR: 'Demo action failed. Review the error and reset or retry.',
   }
@@ -652,13 +795,10 @@ function CurrentStatus({
       <div className="current-status">
         <span className="eyebrow">Current incident status</span>
         <h2>{current}</h2>
-        {state.proposed_policy && !state.replay_run && loading !== 'replay' && (
-          <span className="status-context">GUARDRAIL PROPOSED</span>
-        )}
         <p>{descriptions[current]}</p>
         <div className="status-provider">
           <span>Replay provider</span>
-          <strong>{selectedProvider}</strong>
+          <strong>{safeProvider}</strong>
         </div>
       </div>
       <ol aria-label="CUTLINE security story" className="story-list">
@@ -751,6 +891,7 @@ export default function App() {
 
   const replayReady = providerSelectable(state, selectedProvider)
   const currentLifecycle = lifecycleState(state, loading, error)
+  const displayedProvider = state.replay_run?.provider ?? selectedProvider
 
   return (
     <main aria-busy={Boolean(loading)} className="app-shell">
@@ -777,8 +918,9 @@ export default function App() {
             Keep the agent useful.
           </h2>
           <p>
-            Reconstruct a compromised coding-agent run, generate the narrowest deterministic
-            control, and replay the task to prove security without losing utility.
+            Reconstruct a compromised coding-agent run, select a low-disruption deterministic
+            control from curated candidates, and replay the task to prove security without losing
+            utility.
           </p>
         </div>
         <div className="actions">
@@ -793,7 +935,7 @@ export default function App() {
           </button>
           <button
             className="primary"
-            disabled={Boolean(loading) || !state.vulnerable_run}
+            disabled={Boolean(loading) || !state.vulnerable_run || Boolean(state.replay_run)}
             onClick={() => perform('policy', api.generatePolicy)}
             type="button"
           >
@@ -801,9 +943,14 @@ export default function App() {
             {loading === 'policy' ? 'Generating…' : 'Generate guardrail'}
           </button>
           <button
-            aria-describedby="replay-approval"
+            aria-describedby={state.replay_run ? undefined : 'replay-approval'}
             className="primary safe-button"
-            disabled={Boolean(loading) || !state.proposed_policy || !replayReady}
+            disabled={
+              Boolean(loading) ||
+              !state.proposed_policy ||
+              !replayReady ||
+              Boolean(state.replay_run)
+            }
             onClick={() => {
               const policy = state.proposed_policy
               if (policy) {
@@ -844,7 +991,7 @@ export default function App() {
       <CurrentStatus
         current={currentLifecycle}
         loading={loading}
-        selectedProvider={selectedProvider}
+        selectedProvider={displayedProvider}
         state={state}
       />
 
@@ -852,6 +999,8 @@ export default function App() {
         <RunCard title="Before - monitor mode" run={state.vulnerable_run} />
         <RunCard title="After - enforce mode" run={state.replay_run} />
       </section>
+
+      <CompromisedExecution run={state.vulnerable_run} />
 
       <section className="main-grid">
         <div className="left-column">

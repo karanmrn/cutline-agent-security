@@ -39,8 +39,20 @@ export type GraphEdge = {
   status: 'safe' | 'danger' | 'blocked'
 }
 
+export type ExecutionEvidence = {
+  trusted_task: string
+  untrusted_instruction: string
+  instruction_path: string
+  code_path: string
+  code_before: string
+  code_after: string
+  test_command: string
+  attempted_destination: string
+}
+
 export type RunResult = {
   session_id: string
+  fixture_id: string
   mode: 'monitor' | 'enforce'
   provider: string
   status: string
@@ -52,6 +64,7 @@ export type RunResult = {
   test_output: string
   collector_count: number
   events: Event[]
+  execution_evidence?: ExecutionEvidence | null
   graph: {
     nodes: GraphNode[]
     edges: GraphEdge[]
@@ -120,8 +133,18 @@ export type IntegrationStatus = {
   message: string | null
 }
 
+export type Incident = {
+  incident_id: string
+  source_session_id: string
+  severity: 'high'
+  summary: string
+  evidence_event_ids: string[]
+  attack_path_verified: boolean
+}
+
 export type DemoState = {
   vulnerable_run: RunResult | null
+  incident: Incident | null
   proposed_policy: ProposedPolicy | null
   replay_run: RunResult | null
   regression_manifest: RegressionManifest | null

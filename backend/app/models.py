@@ -100,6 +100,19 @@ class EvidenceGraph(BaseModel):
     edges: list[GraphEdge]
 
 
+class ExecutionEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    trusted_task: str
+    untrusted_instruction: str
+    instruction_path: str
+    code_path: str
+    code_before: str
+    code_after: str
+    test_command: str
+    attempted_destination: str
+
+
 class RunResult(BaseModel):
     session_id: str
     fixture_id: str
@@ -115,6 +128,7 @@ class RunResult(BaseModel):
     collector_count: int
     events: list[Event]
     graph: EvidenceGraph
+    execution_evidence: ExecutionEvidence | None = None
 
 
 class PolicyCandidate(BaseModel):
