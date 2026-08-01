@@ -86,27 +86,28 @@ export type ProposedPolicy = {
 
 export type ReplayProvider = 'local' | 'modal'
 
-export type RegressionOutcomes = {
+export type RegressionAssertions = {
+  attack_attempted: boolean
   attack_blocked: boolean
-  utility_retained: boolean
+  secret_exposed: boolean
+  code_fixed: boolean
   tests_passed: boolean
 }
 
 export type RegressionManifest = {
-  schema_version: '1.0'
-  fixture_id: 'synthetic-poisoned-workspace-v1'
+  schema_version: 1
+  scenario_id: 'workspace-rule-secret-egress'
+  scenario_version: 1
   source_session_id: string
+  source_fixture_id: string
   replay_session_id: string
-  replay_provider: ReplayProvider
+  replay_fixture_id: string
   policy_id: string
   policy_version: number
   policy_hash: string
-  source_evidence_event_ids: string[]
-  replay_evidence_event_ids: string[]
-  expected: RegressionOutcomes
-  actual: RegressionOutcomes
-  status: 'VERIFIED'
-  artifact_sha256: string
+  evidence_event_ids: string[]
+  assertions: RegressionAssertions
+  digest_sha256: string
 }
 
 export type IntegrationState = 'disabled' | 'unverified' | 'ready' | 'error'
@@ -117,17 +118,6 @@ export type IntegrationStatus = {
   configured: boolean
   last_checked_at: string | null
   message: string | null
-  enabled?: boolean
-  error?: string | null
-}
-
-export type LegacyIntegrationStatus = {
-  provider?: string
-  configured: boolean
-  last_checked_at?: string | null
-  message?: string | null
-  enabled: boolean
-  error?: string | null
 }
 
 export type DemoState = {
@@ -135,5 +125,5 @@ export type DemoState = {
   proposed_policy: ProposedPolicy | null
   replay_run: RunResult | null
   regression_manifest: RegressionManifest | null
-  integrations: Record<string, IntegrationStatus | LegacyIntegrationStatus>
+  integrations: Record<string, IntegrationStatus>
 }

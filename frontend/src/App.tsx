@@ -21,7 +21,6 @@ import type {
   GraphNode,
   IntegrationState,
   IntegrationStatus,
-  LegacyIntegrationStatus,
   ProposedPolicy,
   RegressionManifest,
   ReplayProvider,
@@ -42,19 +41,14 @@ function redactText(value: string | null | undefined, fallback = '') {
   return value ? value.replace(syntheticCanaryPattern, '[REDACTED]') : fallback
 }
 
-type AnyIntegrationStatus = IntegrationStatus | LegacyIntegrationStatus
-
 function normalizedIntegrationState(
-  status: AnyIntegrationStatus | undefined,
+  status: IntegrationStatus | undefined,
 ): IntegrationState {
-  if (!status) return 'disabled'
-  if ('state' in status && status.state) return status.state
-  if (status.error) return 'error'
-  return status.enabled && status.configured ? 'ready' : 'disabled'
+  return status?.state ?? 'disabled'
 }
 
-function statusMessage(status: AnyIntegrationStatus | undefined) {
-  return redactText(status?.message ?? status?.error)
+function statusMessage(status: IntegrationStatus | undefined) {
+  return redactText(status?.message)
 }
 
 function providerReady(state: DemoState, provider: ReplayProvider) {
@@ -162,7 +156,7 @@ function AttackPath({ run }: { run: RunResult | null }) {
         <Activity aria-hidden="true" size={20} />
       </div>
       {!run ? (
-        <div className="empty">Run compromised agent to reconstruct path.</div>
+        <div className="empty">Run the compromised agent to reconstruct the path.</div>
       ) : (
         <div className="graph-lanes">
           <div className="graph-lane">
@@ -304,7 +298,7 @@ function PolicyPanel({
         {policy && <div className="score">Cost {policy.disruption_score}</div>}
       </div>
       {!policy ? (
-        <div className="empty">Generate guardrail after incident run.</div>
+        <div className="empty">Generate a guardrail after the incident run.</div>
       ) : (
         <>
           <div className="policy-lineage" aria-label="Approved policy identity">
@@ -394,10 +388,18 @@ function EvidencePanel({
   )
 }
 
-function ManifestOutcome({ label, value }: { label: string; value: boolean }) {
+function ManifestAssertion({
+  label,
+  value,
+  passesWhen = true,
+}: {
+  label: string
+  value: boolean
+  passesWhen?: boolean
+}) {
   return (
-    <span className={value ? 'safe-text' : 'danger-text'}>
-      {label}: {value ? 'pass' : 'fail'}
+    <span className={value === passesWhen ? 'safe-text' : 'danger-text'}>
+      {label}: {value ? 'yes' : 'no'}
     </span>
   )
 }
@@ -412,21 +414,15 @@ function RegressionManifestPanel({ manifest }: { manifest: RegressionManifest })
         </div>
         <strong className="manifest-status">
           <FileCheck2 aria-hidden="true" size={14} />
-          {manifest.status}
+          Schema v{manifest.schema_version}
         </strong>
       </div>
       <dl className="manifest-details">
         <div>
-          <dt>Schema</dt>
-          <dd>{manifest.schema_version}</dd>
-        </div>
-        <div>
-          <dt>Fixture</dt>
-          <dd>{redactText(manifest.fixture_id)}</dd>
-        </div>
-        <div>
-          <dt>Provider</dt>
-          <dd>{manifest.replay_provider}</dd>
+          <dt>Scenario</dt>
+          <dd>
+            <span>{redactText(manifest.scenario_id)}</span> v{manifest.scenario_version}
+          </dd>
         </div>
         <div>
           <dt>Policy</dt>
@@ -442,6 +438,20 @@ function RegressionManifestPanel({ manifest }: { manifest: RegressionManifest })
           <dt>Replay session</dt>
           <dd>{redactText(manifest.replay_session_id)}</dd>
         </div>
+        <div className="manifest-fixtures manifest-wide">
+          <dt>Fresh fixture pair</dt>
+          <dd>
+            <span>
+              <small>Source fixture</small>
+              <code>{redactText(manifest.source_fixture_id)}</code>
+            </span>
+            <span aria-hidden="true" className="fixture-arrow">→</span>
+            <span>
+              <small>Replay fixture</small>
+              <code>{redactText(manifest.replay_fixture_id)}</code>
+            </span>
+          </dd>
+        </div>
         <div className="manifest-wide">
           <dt>Policy hash</dt>
           <dd>
@@ -449,33 +459,30 @@ function RegressionManifestPanel({ manifest }: { manifest: RegressionManifest })
           </dd>
         </div>
         <div className="manifest-wide">
-          <dt>Source evidence</dt>
-          <dd>Evidence: {redactText(manifest.source_evidence_event_ids.join(' · '))}</dd>
-        </div>
-        <div className="manifest-wide">
-          <dt>Replay evidence</dt>
-          <dd>Evidence: {redactText(manifest.replay_evidence_event_ids.join(' · '))}</dd>
+          <dt>Evidence</dt>
+          <dd>Evidence: {redactText(manifest.evidence_event_ids.join(' · '))}</dd>
         </div>
         <div className="manifest-digest manifest-wide">
-          <dt>Artifact SHA-256</dt>
+          <dt>Manifest SHA-256</dt>
           <dd>
-            <code>{redactText(manifest.artifact_sha256)}</code>
+            <code>{redactText(manifest.digest_sha256)}</code>
           </dd>
         </div>
       </dl>
-      <div className="manifest-outcome-grid">
-        <div className="manifest-outcomes" aria-label="Expected regression outcomes">
-          <strong>Expected</strong>
-          <ManifestOutcome label="Attack blocked" value={manifest.expected.attack_blocked} />
-          <ManifestOutcome label="Utility retained" value={manifest.expected.utility_retained} />
-          <ManifestOutcome label="Tests passed" value={manifest.expected.tests_passed} />
-        </div>
-        <div className="manifest-outcomes" aria-label="Actual regression outcomes">
-          <strong>Actual</strong>
-          <ManifestOutcome label="Attack blocked" value={manifest.actual.attack_blocked} />
-          <ManifestOutcome label="Utility retained" value={manifest.actual.utility_retained} />
-          <ManifestOutcome label="Tests passed" value={manifest.actual.tests_passed} />
-        </div>
+      <div className="manifest-outcomes" aria-label="Regression assertions">
+        <strong>Assertions</strong>
+        <ManifestAssertion
+          label="Attack attempted"
+          value={manifest.assertions.attack_attempted}
+        />
+        <ManifestAssertion label="Attack blocked" value={manifest.assertions.attack_blocked} />
+        <ManifestAssertion
+          label="Secret exposed"
+          passesWhen={false}
+          value={manifest.assertions.secret_exposed}
+        />
+        <ManifestAssertion label="Code fixed" value={manifest.assertions.code_fixed} />
+        <ManifestAssertion label="Tests passed" value={manifest.assertions.tests_passed} />
       </div>
       <a
         className="manifest-download"
@@ -503,7 +510,7 @@ function IntegrationsPanel({ integrations }: { integrations: DemoState['integrat
           const status = normalizedIntegrationState(integration)
           return (
             <div className="integration" key={name} title={statusMessage(integration) || undefined}>
-              <span>{redactText(integration.provider ?? name)}</span>
+              <span>{redactText(integration.provider)}</span>
               <strong className={`integration-state ${status}`}>{status}</strong>
             </div>
           )
@@ -608,10 +615,14 @@ export default function App() {
       <section className="hero">
         <div>
           <span className="eyebrow">Incident → guardrail → verified replay</span>
-          <h2>Stop attack. Keep agent useful.</h2>
+          <h2>
+            Stop the attack.
+            <br />
+            Keep the agent useful.
+          </h2>
           <p>
-            Reconstruct compromised coding-agent run, generate narrowest deterministic control,
-            and replay task to prove security without losing utility.
+            Reconstruct a compromised coding-agent run, generate the narrowest deterministic
+            control, and replay the task to prove security without losing utility.
           </p>
         </div>
         <div className="actions">

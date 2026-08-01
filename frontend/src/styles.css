@@ -161,8 +161,11 @@ pre { white-space: pre-wrap; overflow: auto; background: #090c12; border: 1px so
 .manifest-details .manifest-wide { grid-column: 1 / -1; }
 .manifest-wide code { display: block; overflow-wrap: anywhere; }
 .manifest-digest code { display: block; overflow-wrap: anywhere; }
-.manifest-outcome-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.manifest-outcomes { display: flex; gap: 8px 14px; flex-wrap: wrap; border: 1px solid rgba(255,255,255,.05); border-radius: 9px; padding: 9px; font-size: 10px; }
+.manifest-fixtures dd { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 9px; }
+.manifest-fixtures dd > span:not(.fixture-arrow) { min-width: 0; }
+.manifest-fixtures small { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.fixture-arrow { align-self: center; color: var(--accent); font-size: 16px; }
+.manifest-outcomes { display: flex; gap: 8px 14px; flex-wrap: wrap; margin-top: 12px; border: 1px solid rgba(255,255,255,.05); border-radius: 9px; padding: 9px; font-size: 10px; }
 .manifest-outcomes > strong { width: 100%; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
 .manifest-download { display: inline-flex; align-items: center; gap: 7px; margin-top: 14px; border: 1px solid rgba(142,125,255,.35); border-radius: 9px; padding: 9px 11px; color: #d1cbff; background: rgba(142,125,255,.08); text-decoration: none; font-size: 11px; }
 .manifest-download:hover { border-color: rgba(142,125,255,.7); }
@@ -185,7 +188,6 @@ pre { white-space: pre-wrap; overflow: auto; background: #090c12; border: 1px so
   .outcomes { grid-template-columns: 1fr; }
   .provider-options { grid-template-columns: 1fr; }
   .manifest-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .manifest-outcome-grid { grid-template-columns: 1fr; }
   .path-row { display: grid; }
   .path-segment { display: grid; }
   .path-arrow { transform: rotate(90deg); margin: 0 auto; }
@@ -200,5 +202,7 @@ pre { white-space: pre-wrap; overflow: auto; background: #090c12; border: 1px so
   .brand span { display: none; }
   .hero h2 { font-size: 34px; }
   .manifest-details { grid-template-columns: 1fr; }
+  .manifest-fixtures dd { grid-template-columns: 1fr; }
+  .fixture-arrow { justify-self: center; transform: rotate(90deg); }
   .evidence-switch { grid-template-columns: 1fr; }
 }

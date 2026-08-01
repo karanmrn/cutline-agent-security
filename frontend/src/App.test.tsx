@@ -153,20 +153,25 @@ const fullState = {
   proposed_policy: policy,
   replay_run: replayRun,
   regression_manifest: {
-    schema_version: '1.0',
-    fixture_id: 'synthetic-poisoned-workspace-v1',
+    schema_version: 1,
+    scenario_id: 'workspace-rule-secret-egress',
+    scenario_version: 1,
     source_session_id: 'session-incident',
+    source_fixture_id: 'fixture-monitor-001',
     replay_session_id: 'session-replay',
-    replay_provider: 'local',
+    replay_fixture_id: 'fixture-replay-001',
     policy_id: policy.id,
     policy_version: policy.version,
     policy_hash: policy.policy_hash,
-    source_evidence_event_ids: ['evt-rule', 'evt-read', 'evt-incident-upload'],
-    replay_evidence_event_ids: ['evt-replay-upload'],
-    expected: { attack_blocked: true, utility_retained: true, tests_passed: true },
-    actual: { attack_blocked: true, utility_retained: true, tests_passed: true },
-    status: 'VERIFIED',
-    artifact_sha256: 'b'.repeat(64),
+    evidence_event_ids: ['evt-rule', 'evt-read', 'evt-incident-upload', 'evt-replay-upload'],
+    assertions: {
+      attack_attempted: true,
+      attack_blocked: true,
+      secret_exposed: false,
+      code_fixed: true,
+      tests_passed: true,
+    },
+    digest_sha256: 'b'.repeat(64),
   },
   integrations,
 } as unknown as DemoState
@@ -185,14 +190,14 @@ const emptyState = {
 } as unknown as DemoState
 
 beforeEach(() => {
-  vi.mocked(api.state).mockResolvedValue(fullState)
+  vi.mocked(api.state).mockResolvedValue(stateWithoutManifest)
   vi.mocked(api.reset).mockResolvedValue(emptyState)
   vi.mocked(api.runVulnerable).mockResolvedValue({
     ...emptyState,
     vulnerable_run: incidentRun,
   } as unknown as DemoState)
-  vi.mocked(api.generatePolicy).mockResolvedValue(fullState)
-  vi.mocked(api.replay).mockResolvedValue(fullState)
+  vi.mocked(api.generatePolicy).mockResolvedValue(stateWithoutManifest)
+  vi.mocked(api.replay).mockResolvedValue(stateWithoutManifest)
 })
 
 afterEach(() => {
@@ -221,6 +226,26 @@ describe('CUTLINE console', () => {
     expect(
       screen.getByText('Configure and verify one network-blocked Modal replay first.'),
     ).toBeInTheDocument()
+  })
+
+  it('does not unlock Modal when canonical integration state is missing', async () => {
+    vi.mocked(api.state).mockResolvedValue({
+      ...stateWithoutManifest,
+      integrations: {
+        ...integrations,
+        modal: {
+          provider: 'modal',
+          configured: true,
+          last_checked_at: null,
+          message: 'Canonical provider state missing.',
+          enabled: true,
+        },
+      },
+    } as unknown as DemoState)
+    render(<App />)
+
+    expect(await screen.findByRole('radio', { name: 'Modal' })).toBeDisabled()
+    expect(screen.getByText('Canonical provider state missing.')).toBeInTheDocument()
   })
 
   it('uses selected ready provider for exact-policy replay', async () => {
@@ -309,10 +334,16 @@ describe('CUTLINE console', () => {
     const download = screen.getByRole('link', { name: 'Download JSON manifest' })
     expect(download).toHaveAttribute('href', '/api/demo/regression-manifest')
     expect(download).toHaveAttribute('download')
-    expect(screen.getByText('VERIFIED')).toBeInTheDocument()
+    expect(screen.getByText('workspace-rule-secret-egress')).toBeInTheDocument()
     expect(screen.getByText('session-incident')).toBeInTheDocument()
     expect(screen.getByText('session-replay')).toBeInTheDocument()
+    expect(screen.getByText('Fresh fixture pair')).toBeInTheDocument()
+    expect(screen.getByText('fixture-monitor-001')).toBeInTheDocument()
+    expect(screen.getByText('fixture-replay-001')).toBeInTheDocument()
     expect(screen.getByText(policy.policy_hash)).toBeInTheDocument()
+    expect(screen.getByText('Attack attempted: yes')).toBeInTheDocument()
+    expect(screen.getByText('Secret exposed: no')).toBeInTheDocument()
+    expect(screen.getByText('b'.repeat(64))).toBeInTheDocument()
   })
 
   it('redacts a synthetic canary if backend reference text contains it', async () => {
@@ -320,12 +351,12 @@ describe('CUTLINE console', () => {
       ...fullState,
       regression_manifest: {
         ...fullState.regression_manifest,
-        source_session_id: 'session-CUTLINE_CANARY_7F3A',
+        source_fixture_id: 'fixture-CUTLINE_CANARY_7F3A',
       },
     } as DemoState)
     render(<App />)
 
-    expect(await screen.findByText('session-[REDACTED]')).toBeInTheDocument()
+    expect(await screen.findByText('fixture-[REDACTED]')).toBeInTheDocument()
     expect(screen.queryByText(/CUTLINE_CANARY_7F3A/)).not.toBeInTheDocument()
   })
 })
