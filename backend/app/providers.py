@@ -6,6 +6,8 @@ from typing import Protocol
 from app.models import ExecutionProvider, ProposedPolicy, RunMode, RunResult
 from app.runner import AgentRunner
 
+MODAL_REPLAY_ERROR = "Modal replay could not be securely verified."
+
 
 class ReplayProvider(Protocol):
     name: ExecutionProvider
@@ -36,8 +38,8 @@ class ModalReplayProvider:
             from modal_sandbox import run_in_modal
 
             return run_in_modal(RunMode.ENFORCE, policy=policy)
-        except Exception as exc:
-            raise ProviderUnavailable(f"Modal replay failed: {exc}") from exc
+        except Exception:  # noqa: BLE001 - provider boundary must redact all failures
+            raise ProviderUnavailable(MODAL_REPLAY_ERROR) from None
 
 
 def get_replay_provider(provider: ExecutionProvider) -> ReplayProvider:
