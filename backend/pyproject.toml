@@ -8,15 +8,15 @@ dependencies = [
   "uvicorn[standard]>=0.34,<1",
   "pydantic>=2.10,<3",
   "pyyaml>=6.0,<7",
-  "pytest>=8.3,<9",
+  "pytest>=9.0.3,<10",
   "httpx2>=2.9,<3",
 ]
 
 [project.optional-dependencies]
 modal = ["modal>=1.0"]
-overmind = ["overmind-sdk"]
+overmind = ["overmind>=0.1.55,<0.2"]
 supabase = ["supabase>=2.15"]
-all = ["modal>=1.0", "overmind-sdk", "supabase>=2.15"]
+all = ["modal>=1.0", "overmind>=0.1.55,<0.2", "supabase>=2.15"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

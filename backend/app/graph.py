@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from app.models import ActionType, EvidenceGraph, Event, GraphEdge, GraphNode
+from app.models import ActionType, Event, EvidenceGraph, GraphEdge, GraphNode
 
 
 def build_evidence_graph(events: list[Event]) -> EvidenceGraph:
+    task = next((event for event in events if event.tool_name == "start_task"), None)
     instruction = next(
         (event for event in events if event.tool_name == "read_workspace_rule"), None
     )
@@ -28,6 +29,7 @@ def build_evidence_graph(events: list[Event]) -> EvidenceGraph:
             label="Trusted user task",
             kind="instruction",
             status="safe",
+            event_id=task.event_id if task else None,
         )
     ]
     edges: list[GraphEdge] = []

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -40,6 +40,18 @@ class RunMode(StrEnum):
     ENFORCE = "enforce"
 
 
+class ExecutionProvider(StrEnum):
+    LOCAL = "local"
+    MODAL = "modal"
+
+
+class IntegrationState(StrEnum):
+    DISABLED = "disabled"
+    UNVERIFIED = "unverified"
+    READY = "ready"
+    ERROR = "error"
+
+
 class PolicyEffect(StrEnum):
     DENY = "DENY"
 
@@ -65,7 +77,7 @@ class Event(BaseModel):
     policy_decision: PolicyDecision = PolicyDecision.NOT_EVALUATED
     outcome: str
     message: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class GraphNode(BaseModel):
@@ -125,6 +137,7 @@ class ProposedPolicy(BaseModel):
 
     id: str
     version: int = 1
+    policy_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     title: str
     description: str
     effect: PolicyEffect
@@ -135,16 +148,74 @@ class ProposedPolicy(BaseModel):
     yaml: str
 
 
+class RegressionOutcomes(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attack_blocked: bool
+    utility_retained: bool
+    tests_passed: bool
+
+
+class RegressionManifest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["1.0"] = "1.0"
+    fixture_id: Literal["synthetic-poisoned-workspace-v1"] = (
+        "synthetic-poisoned-workspace-v1"
+    )
+    source_session_id: str
+    replay_session_id: str
+    replay_provider: ExecutionProvider
+    policy_id: str
+    policy_version: int
+    policy_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_evidence_event_ids: list[str]
+    replay_evidence_event_ids: list[str]
+    expected: RegressionOutcomes
+    actual: RegressionOutcomes
+    status: Literal["VERIFIED"] = "VERIFIED"
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class Incident(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    incident_id: str
+    source_session_id: str
+    severity: Literal["high"]
+    summary: str
+    evidence_event_ids: list[str]
+    attack_path_verified: bool
+
+
+class IntegrationStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    state: IntegrationState
+    configured: bool
+    last_checked_at: datetime | None = None
+    message: str | None = None
+    # Compatibility fields for the current frontend. Remove after frontend
+    # migration to the canonical status shape.
+    enabled: bool
+    error: str | None = None
+
+
 class ReplayApproval(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     approved: Literal[True]
     policy_id: str
     policy_version: int
+    policy_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    provider: ExecutionProvider
 
 
 class DemoState(BaseModel):
     vulnerable_run: RunResult | None = None
+    incident: Incident | None = None
     proposed_policy: ProposedPolicy | None = None
     replay_run: RunResult | None = None
-    integrations: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    regression_manifest: RegressionManifest | None = None
+    integrations: dict[str, IntegrationStatus] = Field(default_factory=dict)

@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from app.event_bus import EventRecorder
 from app.graph import build_evidence_graph
+from app.integrations.overmind_trace import trace_event
 from app.models import (
     ActionType,
     DataClass,
@@ -62,8 +63,13 @@ def create_synthetic_fixture(base_dir: Path) -> Path:
 
 
 class AgentRunner:
-    def __init__(self, provider: str = "local") -> None:
+    def __init__(
+        self,
+        provider: str = "local",
+        session_allowlist: set[str] | None = None,
+    ) -> None:
         self.provider = provider
+        self.session_allowlist = session_allowlist or {"local-build-system"}
 
     def _read_workspace_rule(self, repo: Path, recorder: EventRecorder) -> tuple[str, str]:
         path = repo / ".cursor" / "rules" / "setup.mdc"
@@ -119,6 +125,7 @@ class AgentRunner:
             action_type=ActionType.EXTERNAL_WRITE,
             data_class=DataClass.SECRET,
             destination=destination,
+            session_allowlist=self.session_allowlist,
             policy=policy,
         )
 
@@ -235,7 +242,7 @@ class AgentRunner:
         if enforce and policy is None:
             raise ValueError("Enforce mode requires an approved policy.")
         session_id = f"session_{uuid4().hex[:10]}"
-        recorder = EventRecorder(session_id=session_id)
+        recorder = EventRecorder(session_id=session_id, on_event=trace_event)
         collector = MockCollector()
 
         with tempfile.TemporaryDirectory(prefix="cutline-") as temp_dir:

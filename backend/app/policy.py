@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import Iterable
+import hashlib
+import json
+from collections.abc import Iterable
 
 import yaml
 
+from app.incident import find_attack_chain
 from app.models import (
     ActionType,
     DataClass,
-    Event,
     DestinationMatch,
+    Event,
     PolicyCandidate,
     PolicyDecision,
     PolicyEffect,
@@ -16,14 +19,13 @@ from app.models import (
     ProposedPolicy,
 )
 
-AUTHORIZED_DESTINATIONS = {"local-build-system"}
-
 
 def evaluate_external_write(
     *,
     action_type: ActionType,
     data_class: DataClass,
     destination: str,
+    session_allowlist: set[str],
     policy: ProposedPolicy | None,
 ) -> PolicyDecision:
     if policy is None:
@@ -31,7 +33,7 @@ def evaluate_external_write(
 
     destination_matches = (
         policy.match.destination == DestinationMatch.NOT_IN_SESSION_ALLOWLIST
-        and destination not in AUTHORIZED_DESTINATIONS
+        and destination not in session_allowlist
     )
     prohibited = (
         data_class == policy.match.data_class
@@ -45,36 +47,7 @@ def evaluate_external_write(
 
 def build_policy(events: Iterable[Event]) -> ProposedPolicy:
     events = list(events)
-    secret_read = next(
-        (
-            event
-            for event in events
-            if event.data_class == DataClass.SECRET
-            and event.action_type == ActionType.READ
-        ),
-        None,
-    )
-    external_write = next(
-        (
-            event
-            for event in events
-            if event.action_type == ActionType.EXTERNAL_WRITE
-        ),
-        None,
-    )
-    untrusted_instruction = next(
-        (
-            event
-            for event in events
-            if event.source_trust.value == "UNTRUSTED"
-        ),
-        None,
-    )
-
-    if not secret_read or not external_write or not untrusted_instruction:
-        raise ValueError(
-            "Cannot generate the guardrail because the required evidence path is incomplete."
-        )
+    untrusted_instruction, secret_read, external_write = find_attack_chain(events)
 
     policy_document = {
         "id": "block-secret-egress",
@@ -124,6 +97,13 @@ def build_policy(events: Iterable[Event]) -> ProposedPolicy:
 
     return ProposedPolicy(
         id="block-secret-egress",
+        policy_hash=hashlib.sha256(
+            json.dumps(
+                policy_document,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
         title="Block unauthorized secret egress",
         description=(
             "Deny SECRET-classified external writes when the destination is not "

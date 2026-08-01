@@ -22,13 +22,25 @@ create table if not exists public.cutline_events (
   action_type text not null,
   policy_decision text not null,
   outcome text not null,
+  resource text null,
+  destination text null,
   message text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.cutline_incidents (
+  incident_id text primary key,
+  source_session_id text not null references public.cutline_sessions(session_id) on delete cascade,
+  severity text not null,
+  summary text not null,
+  evidence_event_ids jsonb not null,
   created_at timestamptz not null default now()
 );
 
 create table if not exists public.cutline_policies (
   id text primary key,
   version integer not null,
+  policy_hash text not null,
   effect text not null,
   disruption_score integer not null,
   evidence_event_ids jsonb not null,
@@ -41,6 +53,7 @@ create table if not exists public.cutline_replays (
   policy_id text references public.cutline_policies(id),
   blocked boolean not null,
   utility_retained boolean not null,
+  manifest_sha256 text not null,
   created_at timestamptz not null default now()
 );
 

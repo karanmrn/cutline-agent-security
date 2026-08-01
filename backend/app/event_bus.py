@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import count
 from typing import Any
@@ -18,6 +19,7 @@ from app.models import (
 class EventRecorder:
     session_id: str
     events: list[Event] = field(default_factory=list)
+    on_event: Callable[[Event], None] | None = None
     _sequence: Any = field(default_factory=lambda: count(1), init=False)
 
     def emit(
@@ -56,4 +58,6 @@ class EventRecorder:
             message=message,
         )
         self.events.append(event)
+        if self.on_event:
+            self.on_event(event)
         return event

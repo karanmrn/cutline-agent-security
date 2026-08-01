@@ -7,12 +7,16 @@ from typing import Any
 import modal
 
 from app.modal_worker import SENTINEL
-from app.models import RunMode, RunResult
+from app.models import ProposedPolicy, RunMode, RunResult
 
 APP_NAME = "cutline-replay"
 
 
-def run_in_modal(mode: RunMode) -> RunResult:
+def run_in_modal(
+    mode: RunMode,
+    *,
+    policy: ProposedPolicy | None = None,
+) -> RunResult:
     """Run one synthetic CUTLINE fixture in a fresh network-blocked Modal Sandbox."""
     app = modal.App.lookup(APP_NAME, create_if_missing=True)
     image = (
@@ -32,14 +36,16 @@ def run_in_modal(mode: RunMode) -> RunResult:
         timeout=120,
     )
     try:
-        process = sandbox.exec(
+        worker_args = [
             "python",
             "-m",
             "app.modal_worker",
             "--mode",
             mode.value,
-            timeout=90,
-        )
+        ]
+        if policy:
+            worker_args.extend(["--policy-json", policy.model_dump_json()])
+        process = sandbox.exec(*worker_args, timeout=90)
         stdout = process.stdout.read()
         stderr = process.stderr.read()
         process.wait()
@@ -73,7 +79,14 @@ def main() -> None:
         default=RunMode.ENFORCE.value,
     )
     args = parser.parse_args()
-    result = run_in_modal(RunMode(args.mode))
+    policy = None
+    if RunMode(args.mode) == RunMode.ENFORCE:
+        from app.policy import build_policy
+        from app.runner import AgentRunner
+
+        vulnerable = AgentRunner().run(RunMode.MONITOR)
+        policy = build_policy(vulnerable.events)
+    result = run_in_modal(RunMode(args.mode), policy=policy)
     print(result.model_dump_json(indent=2))
 
 
