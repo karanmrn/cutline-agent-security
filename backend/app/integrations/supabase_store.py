@@ -15,6 +15,7 @@ def _safe_text(value: str) -> str:
 def _session_row(run: RunResult) -> dict[str, Any]:
     return {
         "session_id": run.session_id,
+        "fixture_id": run.fixture_id,
         "mode": run.mode.value,
         "provider": run.provider,
         "status": run.status,
@@ -79,7 +80,7 @@ def mirror_rows(
                 "policy_id": policy.id,
                 "blocked": replay.exfiltration_blocked,
                 "utility_retained": replay.code_fixed,
-                "manifest_sha256": manifest.artifact_sha256,
+                "digest_sha256": manifest.digest_sha256,
             }
         ],
     }
@@ -141,8 +142,6 @@ class SupabaseMirror:
                 "configured": False,
                 "last_checked_at": None,
                 "message": "Set CUTLINE_SUPABASE_ENABLED=1 after configuring Supabase.",
-                "enabled": False,
-                "error": None,
             }
         self._ensure_client()
         if self.error:
@@ -152,8 +151,6 @@ class SupabaseMirror:
                 "configured": self._configured,
                 "last_checked_at": self.last_checked_at,
                 "message": self.error,
-                "enabled": False,
-                "error": self.error,
             }
         return {
             "provider": "supabase",
@@ -161,8 +158,6 @@ class SupabaseMirror:
             "configured": self.client is not None,
             "last_checked_at": self.last_checked_at,
             "message": None if self.client else "Run one mirror write to verify Supabase.",
-            "enabled": self.client is not None,
-            "error": None,
         }
 
 

@@ -2,6 +2,7 @@
 
 create table if not exists public.cutline_sessions (
   session_id text primary key,
+  fixture_id text not null,
   mode text not null,
   provider text not null,
   status text not null,
@@ -53,7 +54,7 @@ create table if not exists public.cutline_replays (
   policy_id text references public.cutline_policies(id),
   blocked boolean not null,
   utility_retained boolean not null,
-  manifest_sha256 text not null,
+  digest_sha256 text not null,
   created_at timestamptz not null default now()
 );
 

@@ -31,9 +31,6 @@ def _status(
         configured=configured,
         last_checked_at=checked_at,
         message=message,
-        enabled=state in {IntegrationState.READY, IntegrationState.UNVERIFIED}
-        and configured,
-        error=message if state == IntegrationState.ERROR else None,
     )
 
 

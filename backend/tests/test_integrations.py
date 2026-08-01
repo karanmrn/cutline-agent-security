@@ -1,3 +1,5 @@
+import pytest
+
 from app.event_bus import EventRecorder
 from app.integrations.overmind_trace import sanitized_event_attributes, status
 from app.integrations.supabase_store import SupabaseMirror, mirror_rows
@@ -47,11 +49,9 @@ def test_overmind_disabled_status_is_explicit(monkeypatch) -> None:
     assert status() == {
         "provider": "overmind",
         "state": "disabled",
-        "enabled": False,
         "configured": False,
         "last_checked_at": None,
         "message": "Set CUTLINE_OVERMIND_ENABLED=1 after configuring Overmind.",
-        "error": "Set CUTLINE_OVERMIND_ENABLED=1 after configuring Overmind.",
     }
 
 
@@ -90,7 +90,7 @@ def test_supabase_rows_preserve_lineage_without_secret_payloads() -> None:
     assert SYNTHETIC_CANARY not in serialized
     assert rows["incidents"][0]["evidence_event_ids"] == policy.evidence_event_ids
     assert rows["policies"][0]["policy_hash"] == policy.policy_hash
-    assert rows["replays"][0]["manifest_sha256"] == manifest.artifact_sha256
+    assert rows["replays"][0]["digest_sha256"] == manifest.digest_sha256
     assert all("parent_event_id" in row for row in rows["events"])
 
 
@@ -104,6 +104,13 @@ def test_supabase_enabled_without_server_credentials_is_not_configured(monkeypat
     assert status["state"] == "error"
     assert status["configured"] is False
     assert "server-side key" in status["message"]
+    assert set(status) == {
+        "provider",
+        "state",
+        "configured",
+        "last_checked_at",
+        "message",
+    }
 
 
 def test_supabase_enabled_mirror_writes_all_tables_best_effort(monkeypatch) -> None:
@@ -160,6 +167,26 @@ def test_regression_manifest_verifier_rejects_tampering() -> None:
     )
 
     assert verify_regression_manifest(manifest) is True
-    tampered = manifest.model_copy(update={"policy_hash": "0" * 64})
+    tampered = manifest.model_copy(
+        update={
+            "assertions": manifest.assertions.model_copy(
+                update={"attack_blocked": False}
+            )
+        }
+    )
 
     assert verify_regression_manifest(tampered) is False
+
+
+def test_regression_manifest_builder_rejects_failed_invariants() -> None:
+    vulnerable = AgentRunner().run(RunMode.MONITOR)
+    policy = build_policy(vulnerable.events)
+    replay = AgentRunner().run(RunMode.ENFORCE, policy=policy)
+    failed_replay = replay.model_copy(update={"tests_passed": False})
+
+    with pytest.raises(ValueError, match="regression manifest invariants"):
+        build_regression_manifest(
+            vulnerable_run=vulnerable,
+            replay_run=failed_replay,
+            policy=policy,
+        )

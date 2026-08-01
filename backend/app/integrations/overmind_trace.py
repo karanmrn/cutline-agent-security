@@ -67,28 +67,22 @@ def status() -> dict[str, Any]:
         return {
             "provider": "overmind",
             "state": "disabled",
-            "enabled": False,
             "configured": False,
             "last_checked_at": None,
             "message": "Set CUTLINE_OVERMIND_ENABLED=1 after configuring Overmind.",
-            "error": "Set CUTLINE_OVERMIND_ENABLED=1 after configuring Overmind.",
         }
     if _initialization_error:
         return {
             "provider": "overmind",
             "state": "error",
-            "enabled": False,
             "configured": True,
             "last_checked_at": None,
             "message": _initialization_error,
-            "error": _initialization_error,
         }
     return {
         "provider": "overmind",
         "state": "ready" if _tracer is not None else "unverified",
-        "enabled": True,
         "configured": True,
         "last_checked_at": None,
         "message": None if _tracer is not None else "Run one trace to verify Overmind.",
-        "error": None if _tracer is not None else "Run one trace to verify Overmind.",
     }

@@ -102,6 +102,7 @@ class EvidenceGraph(BaseModel):
 
 class RunResult(BaseModel):
     session_id: str
+    fixture_id: str
     mode: RunMode
     provider: str = "local"
     status: str
@@ -148,33 +149,34 @@ class ProposedPolicy(BaseModel):
     yaml: str
 
 
-class RegressionOutcomes(BaseModel):
+class RegressionAssertions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    attack_attempted: bool
     attack_blocked: bool
-    utility_retained: bool
+    secret_exposed: bool
+    code_fixed: bool
     tests_passed: bool
 
 
 class RegressionManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0"] = "1.0"
-    fixture_id: Literal["synthetic-poisoned-workspace-v1"] = (
-        "synthetic-poisoned-workspace-v1"
+    schema_version: Literal[1] = 1
+    scenario_id: Literal["workspace-rule-secret-egress"] = (
+        "workspace-rule-secret-egress"
     )
+    scenario_version: Literal[1] = 1
     source_session_id: str
+    source_fixture_id: str
     replay_session_id: str
-    replay_provider: ExecutionProvider
+    replay_fixture_id: str
     policy_id: str
     policy_version: int
     policy_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    source_evidence_event_ids: list[str]
-    replay_evidence_event_ids: list[str]
-    expected: RegressionOutcomes
-    actual: RegressionOutcomes
-    status: Literal["VERIFIED"] = "VERIFIED"
-    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_event_ids: list[str] = Field(min_length=1)
+    assertions: RegressionAssertions
+    digest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class Incident(BaseModel):
@@ -196,10 +198,6 @@ class IntegrationStatus(BaseModel):
     configured: bool
     last_checked_at: datetime | None = None
     message: str | None = None
-    # Compatibility fields for the current frontend. Remove after frontend
-    # migration to the canonical status shape.
-    enabled: bool
-    error: str | None = None
 
 
 class ReplayApproval(BaseModel):

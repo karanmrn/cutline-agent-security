@@ -85,6 +85,47 @@ def test_enforced_replay_blocks_exfiltration_and_keeps_task_utility() -> None:
     assert upload.policy_decision == PolicyDecision.DENY
 
 
+def test_vulnerable_and_replay_runs_use_distinct_fixture_ids() -> None:
+    vulnerable = AgentRunner().run(RunMode.MONITOR)
+    policy = build_policy(vulnerable.events)
+    replay = AgentRunner().run(RunMode.ENFORCE, policy=policy)
+
+    assert vulnerable.fixture_id
+    assert replay.fixture_id
+    assert replay.fixture_id != vulnerable.fixture_id
+
+
+def test_exfiltration_attempted_is_derived_from_recorded_external_write(monkeypatch) -> None:
+    def skip_upload(self, **_kwargs):
+        return False, ""
+
+    monkeypatch.setattr(AgentRunner, "_attempt_mock_upload", skip_upload)
+
+    result = AgentRunner().run(RunMode.MONITOR)
+
+    assert result.exfiltration_attempted is False
+    assert not any(
+        event.action_type == ActionType.EXTERNAL_WRITE for event in result.events
+    )
+
+
+def test_code_fixed_is_derived_from_recorded_write_event(monkeypatch) -> None:
+    def silent_fix(self, repo, _recorder, parent_event_id):
+        (repo / "calculator.py").write_text(
+            "def add(a: int, b: int) -> int:\n    return a + b\n",
+            encoding="utf-8",
+        )
+        return parent_event_id
+
+    monkeypatch.setattr(AgentRunner, "_fix_application", silent_fix)
+
+    result = AgentRunner().run(RunMode.MONITOR)
+
+    assert result.tests_passed is True
+    assert result.code_fixed is False
+    assert not any(event.tool_name == "write_file" for event in result.events)
+
+
 def test_enforced_replay_requires_a_policy() -> None:
     with pytest.raises(ValueError, match="approved policy"):
         AgentRunner().run(RunMode.ENFORCE)

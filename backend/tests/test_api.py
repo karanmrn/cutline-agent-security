@@ -36,19 +36,44 @@ def test_three_step_api_flow() -> None:
     body = replay.json()
     assert body["replay_run"]["secret_exposed"] is False
     assert body["replay_run"]["tests_passed"] is True
+    assert body["vulnerable_run"]["fixture_id"] != body["replay_run"]["fixture_id"]
     manifest = body["regression_manifest"]
-    assert manifest["schema_version"] == "1.0"
-    assert manifest["fixture_id"] == "synthetic-poisoned-workspace-v1"
+    assert set(manifest) == {
+        "schema_version",
+        "scenario_id",
+        "scenario_version",
+        "source_session_id",
+        "source_fixture_id",
+        "replay_session_id",
+        "replay_fixture_id",
+        "policy_id",
+        "policy_version",
+        "policy_hash",
+        "evidence_event_ids",
+        "assertions",
+        "digest_sha256",
+    }
+    assert manifest["schema_version"] == 1
+    assert manifest["scenario_id"] == "workspace-rule-secret-egress"
+    assert manifest["scenario_version"] == 1
     assert manifest["source_session_id"] == body["vulnerable_run"]["session_id"]
+    assert manifest["source_fixture_id"] == body["vulnerable_run"]["fixture_id"]
     assert manifest["replay_session_id"] == body["replay_run"]["session_id"]
+    assert manifest["replay_fixture_id"] == body["replay_run"]["fixture_id"]
+    assert manifest["policy_id"] == proposed_policy["id"]
+    assert manifest["policy_version"] == proposed_policy["version"]
     assert manifest["policy_hash"] == proposed_policy["policy_hash"]
-    assert manifest["expected"] == {
+    assert set(proposed_policy["evidence_event_ids"]).issubset(
+        manifest["evidence_event_ids"]
+    )
+    assert manifest["assertions"] == {
+        "attack_attempted": True,
         "attack_blocked": True,
-        "utility_retained": True,
+        "secret_exposed": False,
+        "code_fixed": True,
         "tests_passed": True,
     }
-    assert manifest["actual"] == manifest["expected"]
-    assert len(manifest["artifact_sha256"]) == 64
+    assert len(manifest["digest_sha256"]) == 64
 
     download = client.get("/api/demo/regression-manifest")
     assert download.status_code == 200
@@ -73,7 +98,13 @@ def test_state_reports_modal_as_unverified_before_a_smoke_test() -> None:
     assert modal["configured"] is False
     assert modal["last_checked_at"] is None
     assert isinstance(modal["message"], str)
-    assert modal["enabled"] is False
+    assert set(modal) == {
+        "provider",
+        "state",
+        "configured",
+        "last_checked_at",
+        "message",
+    }
 
 
 def test_modal_enablement_reports_configured_but_not_verified(monkeypatch) -> None:
@@ -82,8 +113,14 @@ def test_modal_enablement_reports_configured_but_not_verified(monkeypatch) -> No
     modal = client.get("/api/state").json()["integrations"]["modal"]
 
     assert modal["state"] == "unverified"
-    assert modal["enabled"] is True
     assert modal["configured"] is True
+    assert set(modal) == {
+        "provider",
+        "state",
+        "configured",
+        "last_checked_at",
+        "message",
+    }
 
 
 def test_modal_replay_never_silently_falls_back_to_local() -> None:
